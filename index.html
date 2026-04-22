@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GymPlan">
+<meta name="description" content="Rutina Full Body 3 días — Intermedio/Avanzado">
+<title>GymPlan · Full Body 3D</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #888;
+    --done: #4caf50;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* ── APP SHELL ── */
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 2px solid var(--accent);
+    padding: calc(12px + var(--safe-top)) 20px 12px;
+    flex-shrink: 0;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 1.9rem;
+    letter-spacing: 3px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .logo span { color: var(--accent2); }
+
+  .prog-wrap { text-align: right; }
+  .prog-label { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .prog-bar { background: var(--border); border-radius: 4px; height: 6px; width: 110px; margin: 4px 0 2px auto; overflow: hidden; }
+  .prog-fill { background: linear-gradient(90deg, var(--accent), var(--accent2)); height: 100%; border-radius: 4px; transition: width .5s cubic-bezier(.4,0,.2,1); width: 0%; }
+  .prog-pct { font-family: 'Bebas Neue', cursive; font-size: 1.2rem; color: var(--accent); }
+
+  /* ── WEEK STRIP ── */
+  .week-strip {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .wd {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 4px;
+    cursor: pointer;
+    border-bottom: 2.5px solid transparent;
+    transition: all .18s;
+    gap: 4px;
+  }
+  .wd:active { background: #1a1a1a; }
+  .wd.active { border-bottom-color: var(--accent); }
+
+  .wd-lbl { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 600; }
+  .wd.active .wd-lbl { color: var(--accent); }
+
+  .wd-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 700; color: var(--muted);
+    transition: all .18s;
+  }
+  .wd.active .wd-dot { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 900; }
+  .wd.done-day .wd-dot { background: var(--done); border-color: var(--done); color: #000; }
+
+  .wd-sub { font-size: 0.55rem; color: #444; text-transform: uppercase; letter-spacing: .5px; }
+  .wd.active .wd-sub { color: #666; }
+
+  /* ── SCROLL AREA ── */
+  .scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 0 0 calc(16px + var(--safe-bot));
+  }
+
+  /* ── SECTION HEADER ── */
+  .section-hdr {
+    padding: 20px 16px 0;
+  }
+
+  .day-title {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 2rem;
+    letter-spacing: 2px;
+    line-height: 1;
+    color: var(--text);
+  }
+  .day-focus {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--accent2);
+    margin-top: 4px;
+  }
+
+  .badges {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px 0;
+    flex-wrap: wrap;
+  }
+  .badge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 0.7rem;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .badge strong { color: var(--text); }
+
+  /* ── SECTION LABEL ── */
+  .sec-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: var(--muted);
+    padding: 16px 16px 8px;
+    border-left: 3px solid var(--accent2);
+    margin-left: 16px;
+    display: block;
+  }
+
+  /* ── EXERCISE CARD ── */
+  .ex-card {
+    margin: 0 12px 8px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all .15s;
+    position: relative;
+    overflow: hidden;
+    -webkit-user-select: none; user-select: none;
+  }
+
+  .ex-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  .ex-card:active { transform: scale(0.98); background: #1a1a1a; }
+  .ex-card.done { border-color: var(--done); background: #071507; }
+  .ex-card.done::before { opacity: 1; background: var(--done); }
+  .ex-card.warmup { opacity: .65; cursor: default; }
+  .ex-card.warmup:active { transform: none; background: var(--surface); }
+
+  .chk {
+    width: 30px; height: 30px; flex-shrink: 0;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    transition: all .15s;
+  }
+  .ex-card.done .chk { background: var(--done); border-color: var(--done); }
+
+  .ex-info { flex: 1; min-width: 0; }
+  .ex-name { font-weight: 600; font-size: .88rem; margin-bottom: 3px; line-height: 1.2; }
+  .ex-card.done .ex-name { text-decoration: line-through; color: var(--muted); }
+
+  .ex-meta {
+    font-size: .72rem; color: var(--muted);
+    display: flex; gap: 10px; flex-wrap: wrap;
+    align-items: center;
+  }
+  .ex-tip { font-style: italic; color: #585858; font-size: .68rem; width: 100%; margin-top: 2px; }
+
+  .tag {
+    font-size: .58rem; text-transform: uppercase; letter-spacing: .8px;
+    padding: 2px 7px; border-radius: 4px;
+    background: var(--surface2); border: 1px solid var(--border);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .tag.compound { border-color: var(--accent); color: var(--accent); }
+  .tag.isolation { border-color: var(--accent2); color: var(--accent2); }
+  .tag.cardio { border-color: #00bcd4; color: #00bcd4; }
+
+  /* ── REST DAY ── */
+  .rest-card {
+    margin: 20px 12px;
+    background: var(--surface);
+    border: 1.5px dashed var(--border);
+    border-radius: 16px;
+    padding: 44px 24px;
+    text-align: center;
+  }
+  .rest-icon { font-size: 3rem; margin-bottom: 10px; }
+  .rest-title { font-family: 'Bebas Neue', cursive; font-size: 1.8rem; color: var(--muted); letter-spacing: 2px; }
+  .rest-text { color: #555; font-size: .82rem; margin-top: 8px; line-height: 1.6; }
+
+  /* ── TIPS ── */
+  .tips-box {
+    margin: 8px 12px 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .tips-box h4 { font-size: .62rem; text-transform: uppercase; letter-spacing: 2px; color: var(--accent2); margin-bottom: 8px; }
+  .tips-box ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+  .tips-box li { font-size: .78rem; color: var(--muted); padding-left: 14px; position: relative; line-height: 1.4; }
+  .tips-box li::before { content: '→'; position: absolute; left: 0; color: var(--accent); }
+
+  /* ── COMPLETE BTN ── */
+  .complete-btn {
+    display: block;
+    margin: 14px 12px 0;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 12px;
+    padding: 15px;
+    font-family: 'Bebas Neue', cursive;
+    font-size: 1.1rem;
+    letter-spacing: 2px;
+    cursor: pointer;
+    width: calc(100% - 24px);
+    transition: all .15s;
+  }
+  .complete-btn:active { background: #c8df30; transform: scale(0.98); }
+
+  .done-banner {
+    margin: 14px 12px 0;
+    text-align: center;
+    color: var(--done);
+    font-family: 'Bebas Neue', cursive;
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+    padding: 14px;
+    border: 1.5px solid var(--done);
+    border-radius: 12px;
+    background: #071507;
+  }
+
+  /* ── RESET ── */
+  .reset-btn {
+    display: block;
+    margin: 10px 12px 0;
+    background: transparent;
+    color: #444;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    width: calc(100% - 24px);
+    font-family: 'DM Sans', sans-serif;
+  }
+  .reset-btn:active { color: var(--accent2); border-color: var(--accent2); }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: calc(24px + var(--safe-bot));
+    left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--accent);
+    color: #000;
+    font-family: 'Bebas Neue', cursive;
+    font-size: 1rem;
+    letter-spacing: 2px;
+    padding: 12px 24px;
+    border-radius: 30px;
+    opacity: 0;
+    transition: all .3s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 999;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-row">
+      <div>
+        <div class="logo">FULL<span>BODY</span></div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-label">Semana</div>
+        <div class="prog-bar"><div class="prog-fill" id="pFill"></div></div>
+        <div class="prog-pct" id="pPct">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="week-strip" id="weekStrip"></div>
+
+  <div class="scroll-area" id="scrollArea"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WEEK = [
+  { lbl:'L', type:'A', rest:false },
+  { lbl:'M', type:'—', rest:true },
+  { lbl:'X', type:'B', rest:false },
+  { lbl:'J', type:'—', rest:true },
+  { lbl:'V', type:'C', rest:false },
+  { lbl:'S', type:'—', rest:true },
+  { lbl:'D', type:'—', rest:true },
+];
+
+const REST = {
+  1:{ icon:'🔄', title:'Recuperación activa', text:'Camina 30 min o haz 20 min de movilidad. Tu músculo crece en el descanso.' },
+  3:{ icon:'⚡', title:'Descanso estratégico', text:'Deja que tu sistema nervioso se recupere antes del viernes de alto volumen.' },
+  5:{ icon:'🌿', title:'Descanso activo', text:'Actividad ligera opcional: natación, bicicleta, yoga. Sin pesas hoy.' },
+  6:{ icon:'🌙', title:'Descanso total', text:'Duerme 7–9 hrs, hidrátate y come suficiente proteína.' },
+};
+
+const SESSIONS = {
+  0:{
+    key:'A', name:'Lunes', focus:'Full Body · Fuerza — Dominante Empuje',
+    duration:'65–75 min', emphasis:'Pecho · Hombros · Tríceps · Pierna',
+    warmup:[
+      {name:'Cardio suave (remo o bici)', reps:'5 min', tag:'cardio'},
+      {name:'Movilidad cadera + hombro', reps:'3 min', tag:''},
+    ],
+    exercises:[
+      {name:'Sentadilla con barra', sets:'4', reps:'5–6', rest:'2–3 min', tag:'compound', tip:'Prioridad #1 — carga pesada, forma impecable.'},
+      {name:'Press banca con barra', sets:'4', reps:'6–8', rest:'2 min', tag:'compound', tip:'Bajada controlada 3 seg, empuje explosivo.'},
+      {name:'Press militar con mancuernas', sets:'3', reps:'8–10', rest:'90s', tag:'compound'},
+      {name:'Remo en máquina o polea baja', sets:'3', reps:'10–12', rest:'90s', tag:'compound', tip:'Balance empuje/jalón — nunca lo omitas.'},
+      {name:'Extensión de tríceps en polea', sets:'3', reps:'12–15', rest:'60s', tag:'isolation'},
+      {name:'Curl de bíceps con mancuernas', sets:'3', reps:'12', rest:'60s', tag:'isolation'},
+      {name:'Plancha isométrica', sets:'3', reps:'45–60 seg', rest:'45s', tag:'isolation'},
+    ],
+    tips:['Empieza con los ejercicios más pesados cuando tienes más energía.','Registra cada peso — la progresión es el motor del músculo.','Descansa 2–3 min en compuestos, 60s en aislamientos.'],
+  },
+  2:{
+    key:'B', name:'Miércoles', focus:'Full Body · Fuerza — Dominante Jalón',
+    duration:'70–80 min', emphasis:'Espalda · Bíceps · Isquiotibiales',
+    warmup:[
+      {name:'Jalones al pecho livianos', reps:'2×15', tag:''},
+      {name:'Rotación manguito con banda', reps:'2×15 c/lado', tag:''},
+    ],
+    exercises:[
+      {name:'Peso muerto convencional', sets:'4', reps:'4–5', rest:'3 min', tag:'compound', tip:'El ejercicio más completo. Espalda neutral siempre.'},
+      {name:'Dominadas / Jalones al pecho', sets:'4', reps:'6–10', rest:'2 min', tag:'compound', tip:'Si haces +10, añade peso con cinturón.'},
+      {name:'Press inclinado con mancuernas', sets:'3', reps:'8–10', rest:'90s', tag:'compound'},
+      {name:'Remo con barra (Barbell row)', sets:'3', reps:'8–10', rest:'90s', tag:'compound'},
+      {name:'Peso muerto rumano (RDL)', sets:'3', reps:'10–12', rest:'90s', tag:'compound', tip:'Siente el estiramiento en isquiotibiales.'},
+      {name:'Elevaciones laterales de hombro', sets:'3', reps:'15', rest:'60s', tag:'isolation'},
+      {name:'Elevaciones de piernas colgando', sets:'3', reps:'12–15', rest:'60s', tag:'isolation'},
+    ],
+    tips:['Peso muerto y dominadas son la columna de esta sesión.','Calienta en peso muerto con 50–60% de tu máximo.','En RDL: baja hasta sentir el estiramiento, no hasta el piso.'],
+  },
+  4:{
+    key:'C', name:'Viernes', focus:'Full Body · Hipertrofia + Funcional',
+    duration:'75–90 min', emphasis:'Volumen alto · Cuerpo completo',
+    warmup:[
+      {name:'Sentadilla goblet liviana', reps:'2×15', tag:''},
+      {name:'Movilidad cadera + rotación torácica', reps:'3 min', tag:''},
+    ],
+    exercises:[
+      {name:'Sentadilla frontal o hack squat', sets:'4', reps:'8–10', rest:'2 min', tag:'compound', tip:'Varía del lunes para atacar cuádriceps distinto.'},
+      {name:'Press banca inclinado con barra', sets:'3', reps:'8–10', rest:'90s', tag:'compound'},
+      {name:'Remo en polea agarre neutro', sets:'4', reps:'10–12', rest:'90s', tag:'compound'},
+      {name:'Hip thrust con barra', sets:'4', reps:'10–12', rest:'90s', tag:'compound', tip:'Contrae el glúteo 1 seg en la parte alta.'},
+      {name:'Fondos en paralelas', sets:'3', reps:'10–12', rest:'75s', tag:'compound'},
+      {name:'Curl femoral en máquina', sets:'3', reps:'12–15', rest:'60s', tag:'isolation'},
+      {name:'Aperturas en polea (chest fly)', sets:'3', reps:'12–15', rest:'60s', tag:'isolation'},
+      {name:'Face pulls en polea', sets:'3', reps:'15–20', rest:'45s', tag:'isolation', tip:'Salud del manguito rotador — nunca te lo saltes.'},
+      {name:'Pantorrillas en máquina de pie', sets:'3', reps:'15–20', rest:'45s', tag:'isolation'},
+    ],
+    tips:['Día de mayor volumen — administra bien la energía.','Face pulls son protección de hombros a largo plazo.','Termina con 5–8 min de estiramiento estático.'],
+  },
+};
+
+let exDone = JSON.parse(localStorage.getItem('gp_ex') || '{}');
+let active = (() => { const j=new Date().getDay(); return j===0?6:j-1; })();
+
+function save(){ try{ localStorage.setItem('gp_ex', JSON.stringify(exDone)); }catch(e){} }
+
+function totalEx(){ return Object.values(SESSIONS).reduce((a,s)=>a+s.exercises.length,0); }
+function doneEx(){ let n=0; Object.values(exDone).forEach(d=>n+=Object.values(d).filter(Boolean).length); return n; }
+
+function updateProg(){
+  const p=Math.round(doneEx()/totalEx()*100);
+  document.getElementById('pFill').style.width=p+'%';
+  document.getElementById('pPct').textContent=p+'%';
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function renderStrip(){
+  const strip=document.getElementById('weekStrip');
+  strip.innerHTML='';
+  WEEK.forEach((wd,i)=>{
+    const div=document.createElement('div');
+    const cls=['wd'];
+    if(i===active) cls.push('active');
+    if(!wd.rest){
+      const s=SESSIONS[i]; const d=exDone[i]||{};
+      if(s&&s.exercises.every((_,ei)=>d[ei])) cls.push('done-day');
+    }
+    div.className=cls.join(' ');
+    div.innerHTML=`<div class="wd-lbl">${wd.lbl}</div><div class="wd-dot">${cls.includes('done-day')?'✓':wd.type}</div><div class="wd-sub">${wd.rest?'desc':'ses'}</div>`;
+    div.onclick=()=>{ active=i; render(); document.getElementById('scrollArea').scrollTop=0; };
+    strip.appendChild(div);
+  });
+}
+
+function renderContent(){
+  const area=document.getElementById('scrollArea');
+  const wd=WEEK[active];
+  const dayNames=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+  if(wd.rest){
+    const r=REST[active]||{icon:'😴',title:'Descanso',text:'Recupera energías.'};
+    area.innerHTML=`
+      <div class="section-hdr"><div class="day-title">${dayNames[active]}</div><div class="day-focus">Día de descanso</div></div>
+      <div class="rest-card"><div class="rest-icon">${r.icon}</div><div class="rest-title">${r.title}</div><div class="rest-text">${r.text}</div></div>`;
+    return;
+  }
+
+  const s=SESSIONS[active];
+  if(!s){ area.innerHTML=''; return; }
+  const d=exDone[active]||{};
+  const allDone=s.exercises.every((_,i)=>d[i]);
+
+  const warmupHTML=s.warmup.map(w=>`
+    <div class="ex-card warmup">
+      <div class="chk" style="border-color:#333;color:#555">○</div>
+      <div class="ex-info">
+        <div class="ex-name" style="color:#777;font-weight:500">${w.name}</div>
+        <div class="ex-meta"><span>⏱ ${w.reps}</span></div>
+      </div>
+      ${w.tag?`<div class="tag ${w.tag}">${w.tag==='cardio'?'Cardio':w.tag}</div>`:''}
+    </div>`).join('');
+
+  const exHTML=s.exercises.map((ex,i)=>{
+    const done=!!d[i];
+    return `<div class="ex-card ${done?'done':''}" onclick="toggleEx(${active},${i})">
+      <div class="chk">${done?'✓':''}</div>
+      <div class="ex-info">
+        <div class="ex-name">${ex.name}</div>
+        <div class="ex-meta">
+          <span>📋 ${ex.sets}×${ex.reps}</span>
+          <span>⏸ ${ex.rest}</span>
+        </div>
+        ${ex.tip?`<div class="ex-tip">💡 ${ex.tip}</div>`:''}
+      </div>
+      <div class="tag ${ex.tag}">${ex.tag==='compound'?'Comp.':'Aísl.'}</div>
+    </div>`;
+  }).join('');
+
+  const tipsHTML=s.tips?`<div class="tips-box"><h4>💡 Claves</h4><ul>${s.tips.map(t=>`<li>${t}</li>`).join('')}</ul></div>`:'';
+
+  area.innerHTML=`
+    <div class="section-hdr">
+      <div class="day-title">${s.name} · <span style="color:var(--accent)">Sesión ${s.key}</span></div>
+      <div class="day-focus">${s.focus}</div>
+    </div>
+    <div class="badges">
+      <div class="badge">⏱ <strong>${s.duration}</strong></div>
+      <div class="badge">🎯 <strong>${s.emphasis}</strong></div>
+      <div class="badge">💪 <strong>${s.exercises.length} ejercicios</strong></div>
+    </div>
+    <span class="sec-label">Calentamiento</span>
+    ${warmupHTML}
+    <span class="sec-label">Ejercicios principales</span>
+    ${exHTML}
+    ${!allDone
+      ?`<button class="complete-btn" onclick="markAll(${active})">✓ Completar sesión ${s.key}</button>`
+      :`<div class="done-banner">🎯 ¡SESIÓN ${s.key} COMPLETADA!</div>`
+    }
+    ${tipsHTML}
+    <button class="reset-btn" onclick="resetDay(${active})">↺ Reiniciar este día</button>
+    <div style="height:8px"></div>
+  `;
+}
+
+function render(){ renderStrip(); renderContent(); updateProg(); }
+
+function toggleEx(day,idx){
+  if(!exDone[day]) exDone[day]={};
+  exDone[day][idx]=!exDone[day][idx];
+  const s=SESSIONS[day];
+  if(exDone[day][idx]){
+    const done=s.exercises.filter((_,i)=>exDone[day][i]).length;
+    if(done===s.exercises.length) showToast('🎯 ¡SESIÓN COMPLETADA!');
+  }
+  save(); render();
+}
+
+function markAll(day){
+  const s=SESSIONS[day]; if(!s) return;
+  if(!exDone[day]) exDone[day]={};
+  s.exercises.forEach((_,i)=>exDone[day][i]=true);
+  showToast('🎯 ¡SESIÓN COMPLETADA!');
+  save(); render();
+}
+
+function resetDay(day){
+  exDone[day]={}; save(); render();
+}
+
+// Service Worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+render();
+</script>
+</body>
+</html>
