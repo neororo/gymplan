@@ -1,6 +1,6 @@
 'use strict';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = window.PDF_WORKER_SRC || 'vendor/pdf.worker.min.js';
 const { PDFDocument, StandardFonts, rgb, degrees } = PDFLib;
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -59,12 +59,45 @@ function hexToRgb(hex) {
 
 function baseName(name) { return name.replace(/\.[^.]+$/, ''); }
 
-function download(bytes, filename) {
+// Inside the claude.ai viewer, files are offered through the `downloads`
+// capability; everywhere else a regular <a download> link is used.
+const embedded = typeof window.claude?.use === 'function';
+let downloadsApi;
+async function download(bytes, filename) {
+  if (embedded) {
+    if (downloadsApi === undefined) downloadsApi = await window.claude.use('downloads');
+    if (!downloadsApi) { toast('La descarga no está disponible en esta vista'); return false; }
+    try {
+      await downloadsApi.save({ filename, data: new Blob([bytes], { type: 'application/pdf' }) });
+      return true;
+    } catch (err) {
+      if (err?.code !== 'declined') toast('No se pudo guardar el archivo: ' + (err?.message || err?.code || err));
+      return false;
+    }
+  }
   const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
   const a = document.createElement('a');
   a.href = url; a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return true;
+}
+
+function confirmModal(message, okLabel = 'Aceptar') {
+  return new Promise(resolve => {
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.innerHTML = `<div class="modal" role="dialog"><p></p><div class="modal-actions">
+      <button class="btn" data-k="no">Cancelar</button>
+      <button class="btn primary" data-k="yes"></button></div></div>`;
+    bg.querySelector('p').textContent = message;
+    bg.querySelector('[data-k="yes"]').textContent = okLabel;
+    document.body.appendChild(bg);
+    bg.addEventListener('click', e => {
+      const k = e.target.closest('[data-k]')?.dataset.k;
+      if (k || e.target === bg) { bg.remove(); resolve(k === 'yes'); }
+    });
+  });
 }
 
 function showView(id) {
@@ -213,6 +246,29 @@ async function handleFiles(fileList, mode) {
   });
 }
 
+async function openSample() {
+  await busy(async () => {
+    const doc = await PDFDocument.create();
+    const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+    const reg = await doc.embedFont(StandardFonts.Helvetica);
+    const ink = rgb(0.1, 0.1, 0.12), grey = rgb(0.42, 0.42, 0.46);
+    const pages = [
+      ['Contrato de arriendo', ['Entre las partes que suscriben se acuerda el arriendo del inmueble', 'ubicado en Av. Providencia 1234, depto. 56, Santiago.', '', 'Primera. El plazo del contrato es de 12 meses a contar del', '1 de noviembre de 2026, renovable por periodos iguales.', '', 'Segunda. La renta mensual es de $650.000, pagadera dentro de', 'los primeros cinco días de cada mes.', '', 'Tercera. El arrendatario entrega una garantía equivalente', 'a un mes de renta.']],
+      ['Anexo A: inventario', ['Cocina equipada con horno y encimera.', 'Dos dormitorios con closet.', 'Un estacionamiento y una bodega.', '', 'El arrendatario declara recibir el inmueble en buen estado.']],
+      ['Firmas', ['', 'Arrendador: ______________________', '', '', 'Arrendatario: ______________________', '', '', 'Santiago, 12 de octubre de 2026']],
+    ];
+    pages.forEach(([title, lines], i) => {
+      const p = doc.addPage([595, 842]);
+      p.drawText('PDF de ejemplo', { x: 60, y: 800, size: 9, font: reg, color: grey });
+      p.drawText(title, { x: 60, y: 750, size: 24, font: bold, color: ink });
+      lines.forEach((l, j) => p.drawText(l, { x: 60, y: 700 - j * 22, size: 12, font: reg, color: ink }));
+      p.drawText(`Página ${i + 1} de ${pages.length}`, { x: 260, y: 40, size: 9, font: reg, color: grey });
+    });
+    await loadDocument([{ name: 'Contrato de ejemplo.pdf', bytes: await doc.save() }]);
+    openViewer();
+  });
+}
+
 function pick(mode) {
   pickerMode = mode;
   const inp = $('#fileInput');
@@ -238,6 +294,7 @@ function openViewer() {
   fitWidth(false);
   buildPages();
   buildThumbs();
+  setCurrent(Math.min(state.current, state.pages.length - 1));
   setTool(state.tool === 'sign' ? 'select' : state.tool);
 }
 
@@ -775,8 +832,10 @@ async function buildPdf(pageList = state.pages) {
 async function save() {
   await busy(async () => {
     const bytes = await buildPdf();
-    download(bytes, state.name + (state.dirty ? '-editado' : '') + '.pdf');
-    toast('PDF descargado');
+    if (await download(bytes, state.name + (state.dirty ? '-editado' : '') + '.pdf')) {
+      state.dirty = false;
+      toast('PDF descargado');
+    }
   });
 }
 
@@ -896,8 +955,7 @@ async function orgExtract() {
   if (!sel) return;
   await busy(async () => {
     const bytes = await buildPdf(sel);
-    download(bytes, `${state.name}-paginas.pdf`);
-    toast(`${sel.length} página${sel.length > 1 ? 's' : ''} extraída${sel.length > 1 ? 's' : ''}`);
+    if (await download(bytes, `${state.name}-paginas.pdf`)) toast(`${sel.length} página${sel.length > 1 ? 's' : ''} extraída${sel.length > 1 ? 's' : ''}`);
   });
 }
 
@@ -909,8 +967,9 @@ const actions = {
   organize: () => pick('organize'),
   extract: () => pick('extract'),
   images: () => pick('images'),
-  home: () => {
-    if (state.dirty && !confirm('Tienes cambios sin descargar. ¿Salir de todos modos?')) return;
+  sample: openSample,
+  home: async () => {
+    if (state.dirty && !(await confirmModal('Tienes cambios sin descargar. ¿Salir de todos modos?', 'Salir'))) return;
     showView('home');
     renderRecents();
   },
@@ -1008,7 +1067,9 @@ window.addEventListener('resize', () => {
   resizeT = setTimeout(() => { if (!$('#viewer').hidden) for (const t of $$('.text-input')) t.blur(); }, 200);
 });
 
-if (!navigator.share) $('#shareBtn').hidden = true;
+if (!navigator.share || embedded) $('#shareBtn').hidden = true;
+// The embedded viewer cannot open the print dialog
+if (embedded) $('[data-action="print"]').hidden = true;
 buildSwatches();
 updateUndo();
 renderRecents();

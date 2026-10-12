@@ -28,7 +28,8 @@
     --safe-bot: env(safe-area-inset-bottom, 0px);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --bg: #141417;
       --surface: #1d1d21;
       --surface2: #29292f;
@@ -40,6 +41,18 @@
       --shadow: 0 1px 3px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.3);
     }
   }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #141417;
+    --surface: #1d1d21;
+    --surface2: #29292f;
+    --border: #34343b;
+    --text: #ececf0;
+    --muted: #9a9aa5;
+    --accent: #ff4d55;
+    --canvas-bg: #0e0e10;
+    --shadow: 0 1px 3px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.3);
+  }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
@@ -48,7 +61,7 @@
   svg.i { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
   [hidden] { display: none !important; }
 
-  .app { display: flex; flex-direction: column; height: 100dvh; }
+  .app { display: flex; flex-direction: column; height: 100%; }
 
   /* ── Top bar ── */
   .topbar { display: flex; align-items: center; gap: 8px; padding: calc(8px + var(--safe-top)) 12px 8px; background: var(--surface); border-bottom: 1px solid var(--border); min-height: 52px; flex-shrink: 0; }
@@ -232,6 +245,7 @@
           <button class="tool" data-action="merge"><div class="ti"><svg class="i"><use href="#i-merge"/></svg></div><div><b>Combinar archivos</b><span>Une varios PDF en uno</span></div></button>
           <button class="tool" data-action="organize"><div class="ti"><svg class="i"><use href="#i-grid"/></svg></div><div><b>Organizar páginas</b><span>Reordena, gira y elimina</span></div></button>
           <button class="tool" data-action="extract"><div class="ti"><svg class="i"><use href="#i-cut"/></svg></div><div><b>Extraer páginas</b><span>Crea un PDF con algunas páginas</span></div></button>
+          <button class="tool" data-action="sample"><div class="ti"><svg class="i"><use href="#i-file"/></svg></div><div><b>Probar con un ejemplo</b><span>Abre un contrato de muestra</span></div></button>
           <button class="tool" data-action="images"><div class="ti"><svg class="i"><use href="#i-image"/></svg></div><div><b>Imágenes a PDF</b><span>Convierte JPG o PNG a PDF</span></div></button>
         </div>
 
