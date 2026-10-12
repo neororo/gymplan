@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1b1b1f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PDFlow">
+<meta name="description" content="Lector y editor de PDF: anotar, firmar, combinar y organizar páginas, todo en tu dispositivo.">
+<title>PDFlow</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root {
+    --bg: #f3f3f5;
+    --surface: #ffffff;
+    --surface2: #ececf0;
+    --border: #d9d9df;
+    --text: #1b1b1f;
+    --muted: #6b6b75;
+    --accent: #d7262f;
+    --accent-ink: #ffffff;
+    --canvas-bg: #e4e4e8;
+    --shadow: 0 1px 3px rgba(0,0,0,.12), 0 4px 14px rgba(0,0,0,.06);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141417;
+      --surface: #1d1d21;
+      --surface2: #29292f;
+      --border: #34343b;
+      --text: #ececf0;
+      --muted: #9a9aa5;
+      --accent: #ff4d55;
+      --canvas-bg: #0e0e10;
+      --shadow: 0 1px 3px rgba(0,0,0,.5), 0 4px 14px rgba(0,0,0,.3);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  input, textarea { font: inherit; color: inherit; }
+  svg.i { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+  [hidden] { display: none !important; }
+
+  .app { display: flex; flex-direction: column; height: 100dvh; }
+
+  /* ── Top bar ── */
+  .topbar { display: flex; align-items: center; gap: 8px; padding: calc(8px + var(--safe-top)) 12px 8px; background: var(--surface); border-bottom: 1px solid var(--border); min-height: 52px; flex-shrink: 0; }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+  .brand-mark { width: 28px; height: 28px; border-radius: 7px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; font-size: .8rem; }
+  .doc-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  .spacer { flex: 1; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
+  .btn:hover { background: var(--surface2); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; }
+  .icon-btn:hover { background: var(--surface2); }
+  .icon-btn.on { background: var(--accent); color: var(--accent-ink); }
+  .icon-btn:disabled { opacity: .35; cursor: default; background: none; }
+
+  /* ── Home ── */
+  .home { flex: 1; overflow-y: auto; padding: 24px 16px calc(24px + var(--safe-bot)); }
+  .home-inner { max-width: 960px; margin: 0 auto; }
+  .home h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  .home p.lead { color: var(--muted); margin-bottom: 20px; }
+  .drop { border: 2px dashed var(--border); border-radius: 14px; padding: 28px 16px; text-align: center; background: var(--surface); margin-bottom: 28px; transition: border-color .15s, background .15s; }
+  .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+  .drop .btn { margin-top: 12px; }
+  .drop small { display: block; color: var(--muted); margin-top: 10px; }
+  .section-title { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; font-weight: 700; }
+  .tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .tool { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); transition: transform .12s, box-shadow .12s; }
+  .tool:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+  .tool .ti { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); flex-shrink: 0; }
+  .tool b { display: block; margin-bottom: 2px; }
+  .tool span { color: var(--muted); font-size: .85rem; }
+  .recents { display: grid; gap: 8px; }
+  .recent { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); text-align: left; width: 100%; }
+  .recent:hover { background: var(--surface2); }
+  .recent .meta { color: var(--muted); font-size: .8rem; }
+  .recent .grow { flex: 1; min-width: 0; }
+  .recent .grow div:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .empty-note { color: var(--muted); font-size: .9rem; }
+
+  /* ── Viewer ── */
+  .toolbar { display: flex; align-items: center; gap: 2px; padding: 6px 8px; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; flex-shrink: 0; scrollbar-width: none; }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .sep { width: 1px; height: 24px; background: var(--border); margin: 0 6px; flex-shrink: 0; }
+  .swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); margin: 0 3px; flex-shrink: 0; }
+  .swatch.on { box-shadow: 0 0 0 2px var(--text); }
+  .zoom-lbl { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; font-size: .85rem; }
+  .page-ind { display: flex; align-items: center; gap: 4px; font-size: .85rem; white-space: nowrap; }
+  .page-ind input { width: 42px; text-align: center; padding: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); }
+
+  .workspace { flex: 1; display: flex; min-height: 0; position: relative; }
+  .sidebar { width: 200px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  .side-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .side-tabs button { flex: 1; padding: 9px; font-weight: 600; font-size: .85rem; color: var(--muted); border-bottom: 2px solid transparent; }
+  .side-tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+  .side-body { flex: 1; overflow-y: auto; padding: 12px; }
+  .thumbs { display: grid; gap: 14px; justify-items: center; }
+  .thumb { display: grid; justify-items: center; gap: 4px; font-size: .78rem; color: var(--muted); }
+  .thumb img, .thumb .ph { max-width: 140px; max-height: 180px; border: 2px solid transparent; border-radius: 4px; box-shadow: var(--shadow); background: #fff; display: block; }
+  .thumb .ph { width: 110px; height: 142px; }
+  .thumb.cur img, .thumb.cur .ph { border-color: var(--accent); }
+  .search-box { display: flex; gap: 6px; margin-bottom: 10px; }
+  .search-box input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+  .results { display: grid; gap: 6px; }
+  .result { text-align: left; padding: 8px; border-radius: 8px; background: var(--surface2); font-size: .82rem; }
+  .result b { color: var(--accent); }
+  .result .pg { font-size: .72rem; color: var(--muted); display: block; margin-bottom: 2px; }
+  .result mark { background: #ffe14d; color: #000; border-radius: 2px; }
+
+  .pages { flex: 1; overflow: auto; background: var(--canvas-bg); padding: 16px 12px calc(32px + var(--safe-bot)); }
+  .page { position: relative; margin: 0 auto 16px; background: #fff; box-shadow: var(--shadow); }
+  .page canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .page svg.overlay { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; touch-action: none; }
+  .pages[data-tool="select"] svg.overlay { pointer-events: none; }
+  .pages[data-tool="select"] svg.overlay * { pointer-events: none; }
+  .pages[data-tool="erase"] svg.overlay [data-i] { cursor: pointer; }
+  .pages[data-tool="erase"] svg.overlay [data-i]:hover { opacity: .5; }
+  .pages[data-tool="move"] svg.overlay [data-i] { cursor: move; }
+  .pages:not([data-tool="select"]):not([data-tool="erase"]):not([data-tool="move"]) svg.overlay { cursor: crosshair; }
+  .page .num { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: .72rem; color: var(--muted); }
+  .text-input { position: absolute; z-index: 5; min-width: 120px; min-height: 1.6em; border: 1.5px dashed var(--accent); background: rgba(255,255,255,.9); color: #000; padding: 2px 4px; resize: both; outline: none; font-family: Helvetica, Arial, sans-serif; line-height: 1.15; }
+
+  /* pdf.js text layer */
+  .textLayer { position: absolute; text-align: initial; inset: 0; overflow: hidden; opacity: .25; line-height: 1; text-size-adjust: none; -webkit-text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 2; }
+  .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+  .textLayer span.markedContent { top: 0; height: 0; }
+  .textLayer span.hit { background: #ffd400; border-radius: 2px; }
+  .textLayer ::selection { background: AccentColor; }
+  .textLayer br::selection { background: transparent; }
+  .textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: -1; cursor: default; user-select: none; }
+  .textLayer .endOfContent.active { top: 0; }
+
+  /* ── Organize ── */
+  .organize { flex: 1; overflow-y: auto; background: var(--canvas-bg); padding: 16px 12px calc(32px + var(--safe-bot)); }
+  .org-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 18px; max-width: 1100px; margin: 0 auto; }
+  .org-card { display: grid; justify-items: center; gap: 6px; padding: 10px; border-radius: 10px; border: 2px solid transparent; cursor: pointer; user-select: none; }
+  .org-card.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .org-card.drag-over { border-style: dashed; border-color: var(--muted); }
+  .org-card img, .org-card .ph { max-width: 130px; max-height: 170px; background: #fff; box-shadow: var(--shadow); border-radius: 3px; display: block; }
+  .org-card .ph { width: 110px; height: 142px; }
+  .org-card .lbl { font-size: .8rem; color: var(--muted); }
+  .org-hint { text-align: center; color: var(--muted); font-size: .85rem; margin-bottom: 14px; }
+
+  /* ── Modal ── */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 50; padding: 16px; }
+  .modal { background: var(--surface); border-radius: 14px; padding: 18px; width: min(520px, 100%); box-shadow: var(--shadow); }
+  .modal h2 { font-size: 1.1rem; margin-bottom: 10px; }
+  .sig-pad { width: 100%; height: 180px; background: #fff; border: 1px solid var(--border); border-radius: 10px; touch-action: none; display: block; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+  .modal p { color: var(--muted); font-size: .88rem; margin-bottom: 10px; }
+
+  .toast { position: fixed; left: 50%; bottom: calc(24px + var(--safe-bot)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 60; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+  .busy { position: fixed; inset: 0; background: rgba(0,0,0,.25); display: grid; place-items: center; z-index: 70; }
+  .spinner { width: 42px; height: 42px; border: 4px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 720px) {
+    .sidebar { position: absolute; inset: 0 auto 0 0; z-index: 10; box-shadow: var(--shadow); }
+    .hide-sm { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-merge" viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="11" rx="1"/><rect x="13" y="9" width="8" height="11" rx="1"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="7" rx="1"/><rect x="14" y="4" width="6" height="7" rx="1"/><rect x="4" y="14" width="6" height="7" rx="1"/><rect x="14" y="14" width="6" height="7" rx="1"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/></symbol>
+    <symbol id="i-sign" viewBox="0 0 24 24"><path d="M3 19c3-6 5-9 7-9s0 6 2 6 3-4 5-4 2 3 4 3"/><path d="M3 22h18"/></symbol>
+    <symbol id="i-cut" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 14h6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+    <symbol id="i-side" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-cursor" viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6z"/></symbol>
+    <symbol id="i-hl" viewBox="0 0 24 24"><path d="M9 11l-5 5v4h4l5-5M14 6l4 4-6 6-4-4z"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></symbol>
+    <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></symbol>
+    <symbol id="i-move" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></symbol>
+    <symbol id="i-erase" viewBox="0 0 24 24"><path d="M20 20H8l-4-4a2 2 0 0 1 0-3l9-9a2 2 0 0 1 3 0l4 4a2 2 0 0 1 0 3l-8 8"/><path d="M7 10l7 7"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></symbol>
+    <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></symbol>
+    <symbol id="i-rotl" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-rotr" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <!-- HOME -->
+  <section id="home" class="app">
+    <header class="topbar">
+      <div class="brand"><div class="brand-mark">PDF</div>PDFlow</div>
+    </header>
+    <div class="home">
+      <div class="home-inner">
+        <h1>Trabaja con tus PDF</h1>
+        <p class="lead">Lee, anota, firma, combina y organiza páginas. Todo se procesa en tu dispositivo: tus archivos no se suben a ningún servidor.</p>
+
+        <div class="drop" id="drop">
+          <svg class="i" style="width:40px;height:40px;color:var(--accent)"><use href="#i-file"/></svg>
+          <div style="font-weight:600;margin-top:6px">Arrastra un PDF aquí</div>
+          <button class="btn primary" data-action="open"><svg class="i"><use href="#i-open"/></svg>Seleccionar archivo</button>
+          <small>PDF o imágenes (JPG, PNG)</small>
+        </div>
+
+        <div class="section-title">Herramientas</div>
+        <div class="tools">
+          <button class="tool" data-action="open"><div class="ti"><svg class="i"><use href="#i-open"/></svg></div><div><b>Abrir PDF</b><span>Leer, buscar y anotar</span></div></button>
+          <button class="tool" data-action="sign"><div class="ti"><svg class="i"><use href="#i-sign"/></svg></div><div><b>Rellenar y firmar</b><span>Agrega texto y tu firma</span></div></button>
+          <button class="tool" data-action="merge"><div class="ti"><svg class="i"><use href="#i-merge"/></svg></div><div><b>Combinar archivos</b><span>Une varios PDF en uno</span></div></button>
+          <button class="tool" data-action="organize"><div class="ti"><svg class="i"><use href="#i-grid"/></svg></div><div><b>Organizar páginas</b><span>Reordena, gira y elimina</span></div></button>
+          <button class="tool" data-action="extract"><div class="ti"><svg class="i"><use href="#i-cut"/></svg></div><div><b>Extraer páginas</b><span>Crea un PDF con algunas páginas</span></div></button>
+          <button class="tool" data-action="images"><div class="ti"><svg class="i"><use href="#i-image"/></svg></div><div><b>Imágenes a PDF</b><span>Convierte JPG o PNG a PDF</span></div></button>
+        </div>
+
+        <div class="section-title">Recientes</div>
+        <div class="recents" id="recents"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEWER -->
+  <section id="viewer" class="app" hidden>
+    <header class="topbar">
+      <button class="icon-btn" data-action="home" title="Inicio"><svg class="i"><use href="#i-back"/></svg></button>
+      <div class="doc-name" id="docName"></div>
+      <button class="btn hide-sm" data-action="organize-current"><svg class="i"><use href="#i-grid"/></svg>Organizar</button>
+      <button class="icon-btn" data-action="print" title="Imprimir"><svg class="i"><use href="#i-print"/></svg></button>
+      <button class="icon-btn" data-action="share" id="shareBtn" title="Compartir"><svg class="i"><use href="#i-share"/></svg></button>
+      <button class="btn primary" data-action="save" title="Descargar (Ctrl+S)"><svg class="i"><use href="#i-save"/></svg><span class="hide-sm">Descargar</span></button>
+    </header>
+    <div class="toolbar">
+      <button class="icon-btn" data-action="toggle-side" title="Panel lateral"><svg class="i"><use href="#i-side"/></svg></button>
+      <div class="sep"></div>
+      <button class="icon-btn" data-tool="select" title="Seleccionar texto"><svg class="i"><use href="#i-cursor"/></svg></button>
+      <button class="icon-btn" data-tool="highlight" title="Resaltar"><svg class="i"><use href="#i-hl"/></svg></button>
+      <button class="icon-btn" data-tool="draw" title="Dibujar"><svg class="i"><use href="#i-pen"/></svg></button>
+      <button class="icon-btn" data-tool="text" title="Agregar texto"><svg class="i"><use href="#i-text"/></svg></button>
+      <button class="icon-btn" data-tool="rect" title="Rectángulo"><svg class="i"><use href="#i-rect"/></svg></button>
+      <button class="icon-btn" data-tool="sign" title="Firmar"><svg class="i"><use href="#i-sign"/></svg></button>
+      <button class="icon-btn" data-tool="move" title="Mover anotación"><svg class="i"><use href="#i-move"/></svg></button>
+      <button class="icon-btn" data-tool="erase" title="Borrar anotación"><svg class="i"><use href="#i-erase"/></svg></button>
+      <button class="icon-btn" data-action="undo" id="undoBtn" title="Deshacer (Ctrl+Z)"><svg class="i"><use href="#i-undo"/></svg></button>
+      <div class="sep"></div>
+      <div id="swatches" style="display:flex;align-items:center"></div>
+      <div class="sep"></div>
+      <button class="icon-btn" data-action="zoom-out" title="Alejar"><svg class="i"><use href="#i-minus"/></svg></button>
+      <div class="zoom-lbl" id="zoomLbl">100%</div>
+      <button class="icon-btn" data-action="zoom-in" title="Acercar"><svg class="i"><use href="#i-plus"/></svg></button>
+      <button class="icon-btn" data-action="fit" title="Ajustar al ancho"><svg class="i"><use href="#i-fit"/></svg></button>
+      <div class="sep"></div>
+      <div class="page-ind"><input id="pageInput" inputmode="numeric" aria-label="Página"> / <span id="pageCount">0</span></div>
+    </div>
+    <div class="workspace">
+      <aside class="sidebar" id="sidebar">
+        <div class="side-tabs">
+          <button class="on" data-side="thumbs">Páginas</button>
+          <button data-side="search">Buscar</button>
+        </div>
+        <div class="side-body">
+          <div class="thumbs" id="thumbs"></div>
+          <div id="searchPane" hidden>
+            <form class="search-box" id="searchForm">
+              <input id="searchInput" type="search" placeholder="Buscar en el documento">
+            </form>
+            <div class="empty-note" id="searchInfo"></div>
+            <div class="results" id="results"></div>
+          </div>
+        </div>
+      </aside>
+      <main class="pages" id="pages" data-tool="select"></main>
+    </div>
+  </section>
+
+  <!-- ORGANIZE -->
+  <section id="organizer" class="app" hidden>
+    <header class="topbar">
+      <button class="icon-btn" data-action="org-done" title="Volver"><svg class="i"><use href="#i-back"/></svg></button>
+      <div class="doc-name" id="orgTitle">Organizar páginas</div>
+      <button class="btn primary" data-action="org-done"><svg class="i"><use href="#i-check"/></svg>Listo</button>
+    </header>
+    <div class="toolbar">
+      <button class="btn" data-action="org-add"><svg class="i"><use href="#i-plus"/></svg><span>Insertar PDF</span></button>
+      <div class="sep"></div>
+      <button class="icon-btn" data-action="org-rotl" title="Girar a la izquierda"><svg class="i"><use href="#i-rotl"/></svg></button>
+      <button class="icon-btn" data-action="org-rotr" title="Girar a la derecha"><svg class="i"><use href="#i-rotr"/></svg></button>
+      <button class="icon-btn" data-action="org-left" title="Mover antes"><svg class="i"><use href="#i-left"/></svg></button>
+      <button class="icon-btn" data-action="org-right" title="Mover después"><svg class="i"><use href="#i-right"/></svg></button>
+      <button class="icon-btn" data-action="org-delete" title="Eliminar"><svg class="i"><use href="#i-trash"/></svg></button>
+      <div class="sep"></div>
+      <button class="btn" data-action="org-all">Seleccionar todo</button>
+      <button class="btn" data-action="org-extract"><svg class="i"><use href="#i-cut"/></svg><span>Extraer selección</span></button>
+      <span class="empty-note" id="orgSel" style="margin-left:8px;white-space:nowrap"></span>
+    </div>
+    <div class="organize">
+      <div class="org-hint">Toca para seleccionar · Arrastra para reordenar</div>
+      <div class="org-grid" id="orgGrid"></div>
+    </div>
+  </section>
+</div>
+
+<input type="file" id="fileInput" accept="application/pdf,.pdf,image/png,image/jpeg" multiple hidden>
+
+<script src="vendor/pdf.min.js"></script>
+<script src="vendor/pdf-lib.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

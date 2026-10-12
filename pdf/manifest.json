@@ -1,0 +1,18 @@
+{
+  "name": "PDFlow — Lector y editor de PDF",
+  "short_name": "PDFlow",
+  "description": "Lee, anota, firma, combina y organiza PDF en tu dispositivo.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f3f5",
+  "theme_color": "#1b1b1f",
+  "lang": "es",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "file_handlers": [
+    { "action": "./index.html", "accept": { "application/pdf": [".pdf"] } }
+  ]
+}
