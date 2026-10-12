@@ -147,6 +147,8 @@
   svg.overlay .handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: nwse-resize !important; }
   .size-sel { padding: 5px 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); color: var(--text); font: inherit; font-size: .85rem; flex-shrink: 0; }
   .page .num { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: .72rem; color: var(--muted); }
+  .text-input.rich { white-space: pre; resize: none; cursor: text; }
+  .text-input.rich span { white-space: pre; }
   .text-input { position: absolute; z-index: 5; min-width: 120px; min-height: 1.6em; border: 1.5px dashed var(--accent); background: rgba(255,255,255,.9); color: #000; padding: 2px 4px; resize: both; outline: none; font-family: Helvetica, Arial, sans-serif; line-height: 1.15; }
 
   /* pdf.js text layer */
@@ -356,6 +358,7 @@
 
 <script src="vendor/pdf.min.js"></script>
 <script src="vendor/pdf-lib.min.js"></script>
+<script src="vendor/fontkit.umd.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
