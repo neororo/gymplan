@@ -1,4 +1,4 @@
-const CACHE = 'pdflow-v1';
+const CACHE = 'pdflow-v2';
 const ASSETS = [
   './',
   './index.html',
