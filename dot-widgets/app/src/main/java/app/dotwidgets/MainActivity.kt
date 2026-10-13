@@ -1,6 +1,7 @@
 package app.dotwidgets
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
@@ -22,6 +23,8 @@ import app.dotwidgets.Ui.dp
 class MainActivity : Activity() {
 
     private lateinit var content: LinearLayout
+    private var wallpaperStyle = WallpaperStyle.BLACK
+    private var wallpaperTarget = Wallpapers.TARGET_BOTH
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +60,8 @@ class MainActivity : Activity() {
             content.addView(Ui.body(this, getString(R.string.music_access_restricted)))
         }
 
+        if (Wallpapers.canSet(this)) addWallpaperSection()
+
         val manager = AppWidgetManager.getInstance(this)
         val placed = WidgetKind.entries.flatMap { kind -> Scheduler.ids(this, manager, kind).map { kind to it } }
         content.addView(Ui.section(this, R.string.section_my_widgets))
@@ -76,6 +81,83 @@ class MainActivity : Activity() {
             val preview = Previews.render(this, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, dp(140))
             content.addView(row(kind, preview, getString(R.string.add_widget)) { pin(kind) })
         }
+    }
+
+    /** Plain wallpapers (black by default) so the widgets stand out on the home screen. */
+    private fun addWallpaperSection() {
+        content.addView(Ui.section(this, R.string.section_wallpaper))
+        content.addView(Ui.body(this, getString(R.string.wallpaper_hint)))
+
+        val (screenW, screenH) = Wallpapers.screenSize(this)
+        val thumbW = dp(84)
+        val thumbH = (thumbW.toFloat() * screenH / screenW).toInt()
+        val thumbnail = ImageView(this)
+        fun showThumbnail() {
+            thumbnail.setImageBitmap(Wallpapers.render(this, wallpaperStyle, thumbW, thumbH, thumbW.toFloat() / screenW))
+        }
+        showThumbnail()
+
+        val options = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), 0, 0, 0)
+            addView(Ui.choices(this@MainActivity, WallpaperStyle.entries.map { getString(it.label) }, wallpaperStyle.ordinal) {
+                wallpaperStyle = WallpaperStyle.entries[it]
+                showThumbnail()
+            })
+            addView(Ui.choices(
+                this@MainActivity,
+                listOf(getString(R.string.wallpaper_both), getString(R.string.wallpaper_home), getString(R.string.wallpaper_lock)),
+                wallpaperTarget,
+            ) { wallpaperTarget = it })
+            addView(button(getString(R.string.wallpaper_apply)) { confirmWallpaper() })
+        }
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, dp(4))
+            addView(thumbnail, LinearLayout.LayoutParams(thumbW, thumbH))
+            addView(options, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        })
+        content.addView(Button(this).apply {
+            setText(R.string.wallpaper_restore)
+            setTextColor(Ui.MUTED)
+            setBackgroundColor(0)
+            setOnClickListener { confirmRestore() }
+        })
+    }
+
+    private fun confirmWallpaper() {
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle(R.string.wallpaper_apply)
+            .setMessage(R.string.wallpaper_confirm)
+            .setPositiveButton(R.string.wallpaper_apply) { _, _ ->
+                val style = wallpaperStyle
+                val target = wallpaperTarget
+                inBackground(R.string.wallpaper_done) { Wallpapers.apply(this, style, target) }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun confirmRestore() {
+        AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle(R.string.wallpaper_restore)
+            .setMessage(R.string.wallpaper_restore_confirm)
+            .setPositiveButton(R.string.wallpaper_restore) { _, _ ->
+                inBackground(R.string.wallpaper_restored) { Wallpapers.restoreDefault(this) }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    // Writing a full-screen wallpaper takes a moment; keep it off the main thread.
+    private fun inBackground(doneMessage: Int, work: () -> Unit) {
+        Thread {
+            val ok = runCatching(work).isSuccess
+            runOnUiThread {
+                Toast.makeText(this, if (ok) doneMessage else R.string.wallpaper_failed, Toast.LENGTH_SHORT).show()
+            }
+        }.start()
     }
 
     private fun row(kind: WidgetKind, preview: android.graphics.Bitmap, action: String, onClick: () -> Unit): LinearLayout {

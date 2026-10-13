@@ -15,6 +15,10 @@ App Android de widgets para la pantalla de inicio en estilo matriz de puntos, in
 | Nota | Texto propio, centrado o a la izquierda | Abre el editor |
 | Música | Compacto, grande, carátula · carátula en puntos, puntos a color o foto | Abre el reproductor; botones ⏮ ⏯ ⏭ |
 
+## Fondo de pantalla
+
+En la app, la sección **Fondo de pantalla** pone un fondo liso para que los widgets resalten: negro, negro con puntos, grafito o claro con puntos. Se puede aplicar a inicio, bloqueo o ambos. La app no puede guardar una copia del fondo anterior; **Restaurar el fondo predeterminado** vuelve al de fábrica.
+
 ## Widget de música
 
 Funciona con Spotify y con cualquier reproductor que publique una sesión multimedia (YouTube Music, podcasts…). Lee la sesión activa del sistema, la misma que usan los controles de la pantalla de bloqueo: no hace falta cuenta de Spotify ni clave de API.

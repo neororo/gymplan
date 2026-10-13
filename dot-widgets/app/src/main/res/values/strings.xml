@@ -84,6 +84,23 @@
     <string name="music_access_button">Dar acceso</string>
     <string name="music_access_ok">Acceso a la música activado.</string>
 
+    <string name="section_wallpaper">Fondo de pantalla</string>
+    <string name="wallpaper_hint">Un fondo liso hace que los widgets de puntos resalten. Elige uno y aplícalo.</string>
+    <string name="wallpaper_black">Negro</string>
+    <string name="wallpaper_black_dots">Negro con puntos</string>
+    <string name="wallpaper_graphite">Grafito</string>
+    <string name="wallpaper_light_dots">Claro con puntos</string>
+    <string name="wallpaper_both">Inicio y bloqueo</string>
+    <string name="wallpaper_home">Inicio</string>
+    <string name="wallpaper_lock">Bloqueo</string>
+    <string name="wallpaper_apply">Aplicar fondo</string>
+    <string name="wallpaper_confirm">Esto reemplaza tu fondo de pantalla actual. La app no puede guardar una copia, así que si quieres conservarlo, asegúrate de tener la imagen.</string>
+    <string name="wallpaper_done">Fondo aplicado</string>
+    <string name="wallpaper_restore">Restaurar el fondo predeterminado</string>
+    <string name="wallpaper_restore_confirm">Vuelve al fondo que trae el teléfono de fábrica en inicio y bloqueo.</string>
+    <string name="wallpaper_restored">Fondo predeterminado restaurado</string>
+    <string name="wallpaper_failed">No se pudo cambiar el fondo</string>
+
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>
     <string name="add_widget">Añadir</string>
