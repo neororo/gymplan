@@ -20,5 +20,5 @@ HTML/CSS/JS sin build. [pdf.js](https://mozilla.github.io/pdf.js/) 3.11.174 para
 
 ## Limitaciones
 - Editar texto reemplaza visualmente la línea: el texto original queda tapado, no eliminado del archivo.
-- Se editan líneas horizontales; el texto girado dentro de la página no se puede editar.
+- Cada celda de una tabla se edita por separado (se detectan bordes y columnas); se editan líneas horizontales; el texto girado dentro de la página no se puede editar.
 - El texto nuevo usa fuentes libres equivalentes incluidas en `fonts/` (Calibri→Carlito, Cambria→Caladea, Arial→Liberation Sans, Times→Liberation Serif, Courier→Liberation Mono); otras fuentes se aproximan a la más parecida.

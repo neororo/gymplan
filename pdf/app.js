@@ -210,6 +210,7 @@ function resetDoc() {
   state.recentId = null;
   thumbCache = new Map();
   textCache.clear();
+  sepCache.clear();
 }
 
 async function loadDocument(items) {
@@ -694,53 +695,133 @@ function detectFont(page, fontId, style) {
   };
 }
 
-// Groups pdf.js text runs into lines. A line keeps its runs separately, so
-// a bold word or a coloured phrase inside a sentence keeps its format.
+// Vertical rules drawn on the page (table borders, cell edges) in PDF user
+// space. Text on either side of one belongs to different cells.
+const sepCache = new Map();
+async function separators(p) {
+  const key = `${p.src}:${p.idx}`;
+  if (sepCache.has(key)) return sepCache.get(key);
+  const seps = [];
+  try {
+    const { OPS, Util } = pdfjsLib;
+    const ops = await pdfPage(p).getOperatorList();
+    let ctm = [1, 0, 0, 1, 0, 0];
+    const stack = [];
+    const add = (a, b) => {
+      const [x1, y1] = Util.applyTransform(a, ctm), [x2, y2] = Util.applyTransform(b, ctm);
+      if (Math.abs(x2 - x1) < 1.5 && Math.abs(y2 - y1) > 4) seps.push({ x: (x1 + x2) / 2, y1: Math.min(y1, y2), y2: Math.max(y1, y2) });
+    };
+    for (let i = 0; i < ops.fnArray.length; i++) {
+      const fn = ops.fnArray[i], args = ops.argsArray[i];
+      if (fn === OPS.save) stack.push(ctm);
+      else if (fn === OPS.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === OPS.transform) ctm = Util.transform(ctm, args);
+      else if (fn === OPS.paintFormXObjectBegin) { stack.push(ctm); if (args?.[0]) ctm = Util.transform(ctm, args[0]); }
+      else if (fn === OPS.paintFormXObjectEnd) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === OPS.constructPath) {
+        const [pathOps, coords] = args;
+        let j = 0, cur = [0, 0], start = [0, 0];
+        for (const op of pathOps) {
+          if (op === OPS.rectangle) {
+            const [x, y, w, h] = coords.slice(j, j + 4); j += 4;
+            if (Math.abs(w) < 3) add([x + w / 2, y], [x + w / 2, y + h]); // thin filled rule
+            else { add([x, y], [x, y + h]); add([x + w, y], [x + w, y + h]); }
+            cur = start = [x, y];
+          } else if (op === OPS.moveTo) { cur = start = [coords[j], coords[j + 1]]; j += 2; }
+          else if (op === OPS.lineTo) { const nxt = [coords[j], coords[j + 1]]; j += 2; add(cur, nxt); cur = nxt; }
+          else if (op === OPS.curveTo) { cur = [coords[j + 4], coords[j + 5]]; j += 6; }
+          else if (op === OPS.curveTo2 || op === OPS.curveTo3) { cur = [coords[j + 2], coords[j + 3]]; j += 4; }
+          else if (op === OPS.closePath) { add(cur, start); cur = start; }
+        }
+      }
+    }
+  } catch (err) { console.warn(err); }
+  sepCache.set(key, seps);
+  return seps;
+}
+
+// Groups pdf.js text into editable lines. A line stops at table borders and
+// at column gaps, so a table cell is edited on its own. Inside a line the
+// runs are kept apart, so a bold word or a coloured phrase keeps its format.
 async function textItems(p) {
   const key = `${p.src}:${p.idx}`;
   if (textCache.has(key)) return textCache.get(key);
-  const tc = await pdfPage(p).getTextContent();
-  const runs = [];
+  const [tc, seps] = await Promise.all([pdfPage(p).getTextContent(), separators(p)]);
+  const ruleBetween = (xa, xb, y, size) => xb > xa &&
+    seps.some(s => s.x > xa - 0.5 && s.x < xb + 0.5 && s.y1 < y + size * 0.8 && s.y2 > y - size * 0.2);
+
+  // 1. chunks: touching pieces of text in the same font
+  const chunks = [];
   for (const it of tc.items) {
-    if (!it.str || !it.transform) continue;
+    if (!it.str || !it.transform || !it.str.trim()) continue;
     const [a, b, c, d, e, f] = it.transform;
     if (Math.abs(b) > 0.01 || Math.abs(c) > 0.01 || a <= 0) continue; // horizontal text only
     const size = Math.abs(d) || a;
-    const prev = runs[runs.length - 1];
-    const near = prev && Math.abs(prev.y - f) < size * 0.3 && e >= prev.x2 - size * 0.3 && e - prev.x2 < size * 0.8;
-    if (!it.str.trim()) {
-      if (near && !prev.str.endsWith(' ')) { prev.str += ' '; prev.x2 = Math.max(prev.x2, e + it.width); }
-      continue;
-    }
-    if (near && prev.fontId === it.fontName && Math.abs(prev.size - size) < 0.5) {
-      if (e - prev.x2 > size * 0.15 && !prev.str.endsWith(' ') && !it.str.startsWith(' ')) prev.str += ' ';
+    const prev = chunks[chunks.length - 1];
+    if (prev && prev.fontId === it.fontName && Math.abs(prev.size - size) < 0.5 && Math.abs(prev.y - f) < size * 0.3 &&
+        e >= prev.x2 - size * 0.3 && e - prev.x2 < size * 0.15 && !ruleBetween(prev.x2, e, f, size)) {
       prev.str += it.str;
       prev.x2 = Math.max(prev.x2, e + it.width);
       continue;
     }
-    runs.push({ str: it.str, x: e, y: f, x2: e + it.width, size, fontId: it.fontName, style: tc.styles[it.fontName] });
+    chunks.push({ str: it.str, x: e, y: f, x2: e + it.width, size, fontId: it.fontName, style: tc.styles[it.fontName] });
   }
+
+  // 2. rows: chunks on the same baseline, left to right
+  const rows = [];
+  for (const ch of chunks) {
+    const row = rows[rows.length - 1];
+    const last = row && row[row.length - 1];
+    const big = last ? Math.max(last.size, ch.size) : 0;
+    if (last && Math.abs(last.y - ch.y) < big * 0.35 && ch.x >= last.x2 - big * 0.3) row.push(ch);
+    else rows.push([ch]);
+  }
+
+  // 3. split rows into cells: at drawn rules, wide gaps, or gaps that line up
+  //    with a column gap in the row above or below (tables without borders)
+  const GAP = 0.35;
+  const gapEdges = row => row.slice(1).flatMap((ch, i) =>
+    ch.x - row[i].x2 > Math.max(ch.size, row[i].size) * GAP ? [{ start: ch.x, end: row[i].x2 }] : []);
+  const edges = rows.map(gapEdges);
   const lines = [];
-  for (const r of runs) {
-    const l = lines[lines.length - 1];
-    const last = l && l.runs[l.runs.length - 1];
-    const big = last ? Math.max(last.size, r.size) : 0;
-    if (last && Math.abs(last.y - r.y) < big * 0.35 && r.x >= last.x2 - big * 0.3 && r.x - last.x2 < big * 1.2) {
-      if (r.x - last.x2 > r.size * 0.15 && !last.str.endsWith(' ') && !r.str.startsWith(' ')) { last.str += ' '; last.x2 = r.x; }
-      l.runs.push(r);
-    } else {
-      lines.push({ runs: [r] });
+  rows.forEach((row, ri) => {
+    const near = [...(edges[ri - 1] || []), ...(edges[ri + 1] || [])];
+    let cell = [row[0]];
+    for (let i = 1; i < row.length; i++) {
+      const prev = row[i - 1], ch = row[i];
+      const big = Math.max(prev.size, ch.size);
+      const gap = ch.x - prev.x2;
+      const aligned = gap > big * GAP && near.some(g => Math.abs(g.start - ch.x) < 1 || Math.abs(g.end - prev.x2) < 1);
+      if (ruleBetween(prev.x2, ch.x, ch.y, big) || gap > big * 0.8 || aligned) { lines.push(cell); cell = [ch]; }
+      else cell.push(ch);
     }
-  }
-  for (const l of lines) {
-    l.x1 = l.runs[0].x;
-    l.y = l.runs[0].y;
-    l.x2 = Math.max(...l.runs.map(r => r.x2));
-    l.y1 = Math.min(...l.runs.map(r => r.y - r.size * 0.25));
-    l.y2 = Math.max(...l.runs.map(r => r.y + r.size * 0.92));
-  }
-  textCache.set(key, lines);
-  return lines;
+    lines.push(cell);
+  });
+
+  // 4. runs: consecutive chunks with the same font and size
+  const result = lines.map(cell => {
+    const runs = [];
+    for (const ch of cell) {
+      const last = runs[runs.length - 1];
+      const spaced = last && ch.x - last.x2 > ch.size * 0.15 && !last.str.endsWith(' ') && !ch.str.startsWith(' ');
+      if (last && last.fontId === ch.fontId && Math.abs(last.size - ch.size) < 0.5 && Math.abs(last.y - ch.y) < 0.5) {
+        last.str += (spaced ? ' ' : '') + ch.str;
+        last.x2 = ch.x2;
+      } else {
+        if (spaced) { last.str += ' '; last.x2 = ch.x; }
+        runs.push({ ...ch });
+      }
+    }
+    const l = { runs };
+    l.x1 = runs[0].x;
+    l.y = runs[0].y;
+    l.x2 = Math.max(...runs.map(r => r.x2));
+    l.y1 = Math.min(...runs.map(r => r.y - r.size * 0.25));
+    l.y2 = Math.max(...runs.map(r => r.y + r.size * 0.92));
+    return l;
+  });
+  textCache.set(key, result);
+  return result;
 }
 
 function findLine(lines, px, py) {
@@ -1048,6 +1129,7 @@ function openRichEditor(n, a, clientPt, done) {
     done(runs);
   };
   ed.addEventListener('keydown', e => {
+    e.stopPropagation();
     if (e.key === 'Enter') { e.preventDefault(); close(true); }
     if (e.key === 'Escape') close(false);
   });
@@ -1581,7 +1663,7 @@ $('#pages').addEventListener('wheel', e => {
 }, { passive: false });
 
 document.addEventListener('keydown', e => {
-  if ($('#viewer').hidden || e.target.matches('input, textarea')) return;
+  if ($('#viewer').hidden || e.target.matches('input, textarea, select') || e.target.isContentEditable) return;
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
   else if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
