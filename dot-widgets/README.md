@@ -38,7 +38,9 @@ En Android 13+ el permiso de alarmas exactas se concede solo (`USE_EXACT_ALARM`)
 
 1. En GitHub, abre **Actions → Dot Widgets APK** y entra en la última ejecución verde.
 2. Descarga el artefacto `dot-widgets-apk` y descomprímelo en el móvil.
-3. Abre `app-debug.apk` y permite la instalación desde esa fuente. Se instala encima de la versión anterior.
+3. Abre `app-debug.apk` y permite la instalación desde esa fuente.
+
+A partir de la 0.2 las actualizaciones se instalan encima. Si tienes la 0.1, desinstálala antes una vez (estaba firmada con otra clave).
 
 Requiere Android 8.0 o superior.
 

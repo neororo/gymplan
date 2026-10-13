@@ -17,6 +17,17 @@ android {
         versionName = "0.2.0"
     }
 
+    // Fixed debug key so each CI-built APK installs over the previous one. Not a secret:
+    // it uses the standard public debug credentials and only signs debug builds.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
