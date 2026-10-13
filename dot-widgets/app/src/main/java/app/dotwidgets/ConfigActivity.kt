@@ -32,6 +32,7 @@ class ConfigActivity : Activity() {
     private lateinit var kind: WidgetKind
     private lateinit var config: WidgetConfig
     private lateinit var preview: ImageView
+    private var accessBox: LinearLayout? = null
     private var previewWidthDp = 0
     private var previewHeightDp = 0
 
@@ -53,6 +54,32 @@ class ConfigActivity : Activity() {
         previewHeightDp = h
         setContentView(buildContent())
         updatePreview()
+    }
+
+    // Back from the notification-access screen: show the new state and the real track.
+    override fun onResume() {
+        super.onResume()
+        if (::preview.isInitialized) {
+            renderAccess()
+            updatePreview()
+        }
+    }
+
+    private fun renderAccess() {
+        val box = accessBox ?: return
+        box.removeAllViews()
+        if (MediaState.hasAccess(this)) {
+            box.addView(Ui.body(this, getString(R.string.music_access_ok)))
+            return
+        }
+        box.addView(Ui.body(this, getString(R.string.music_access_hint), Ui.WHITE))
+        box.addView(Button(this).apply {
+            setText(R.string.music_access_button)
+            setTextColor(Ui.WHITE)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Ui.RED)
+            setOnClickListener { MediaState.openAccessSettings(this@ConfigActivity) }
+        })
+        box.addView(Ui.body(this, getString(R.string.music_access_restricted)))
     }
 
     private fun buildContent(): LinearLayout {
@@ -97,7 +124,9 @@ class ConfigActivity : Activity() {
 
         form.addView(Ui.section(this, R.string.section_shape))
         form.addView(Ui.slider(this, R.string.option_background, 0, 100, config.bgAlpha, "%") { set(config.copy(bgAlpha = it)) })
-        form.addView(Ui.slider(this, R.string.option_size, 60, 140, config.scale, "%") { set(config.copy(scale = it)) })
+        if (kind != WidgetKind.MUSIC) {
+            form.addView(Ui.slider(this, R.string.option_size, 60, 140, config.scale, "%") { set(config.copy(scale = it)) })
+        }
         form.addView(Ui.body(this, getString(R.string.option_corners), Ui.WHITE))
         form.addView(
             Ui.choices(
@@ -165,6 +194,19 @@ class ConfigActivity : Activity() {
                     }, current.year, current.monthValue - 1, current.dayOfMonth).show()
                 }
                 form.addView(dateButton)
+            }
+            WidgetKind.MUSIC -> {
+                form.addView(Ui.section(this, R.string.section_music))
+                accessBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                form.addView(accessBox)
+                renderAccess()
+                form.addView(
+                    Ui.choices(
+                        this,
+                        listOf(getString(R.string.art_dots), getString(R.string.art_dots_color), getString(R.string.art_photo)),
+                        config.artMode,
+                    ) { set(config.copy(artMode = it)) },
+                )
             }
             WidgetKind.NOTE -> {
                 form.addView(Ui.section(this, R.string.section_text))

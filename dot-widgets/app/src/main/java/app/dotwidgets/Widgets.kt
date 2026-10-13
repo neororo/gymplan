@@ -47,6 +47,7 @@ class DateWidget : KindWidget(WidgetKind.DATE)
 class YearWidget : KindWidget(WidgetKind.PROGRESS)
 class CountdownWidget : KindWidget(WidgetKind.COUNTDOWN)
 class NoteWidget : KindWidget(WidgetKind.NOTE)
+class MusicWidget : KindWidget(WidgetKind.MUSIC)
 
 object WidgetViews {
     // RemoteViews cross binder (~1 MB transaction limit), so keep the bitmap under ~720 KB.
@@ -56,6 +57,7 @@ object WidgetViews {
     fun build(context: Context, manager: AppWidgetManager, id: Int, kind: WidgetKind): RemoteViews {
         val config = WidgetStore.load(context, id, kind)
         val palette = Palettes.find(context, config.palette)
+        if (kind == WidgetKind.MUSIC) return MusicViews.build(context, manager.getAppWidgetOptions(id), id, config, palette)
         val (width, height) = contentSize(context, manager.getAppWidgetOptions(id), kind)
         val bitmap = Renderer(context, config, palette).render(kind, width, height, LocalDateTime.now(), deviceState(context))
         return RemoteViews(context.packageName, R.layout.widget_image).apply {
@@ -67,9 +69,13 @@ object WidgetViews {
         }
     }
 
-    fun deviceState(context: Context): DeviceState {
+    fun deviceState(context: Context, withMedia: Boolean = false): DeviceState {
         val battery = context.getSystemService(BatteryManager::class.java)
-        return DeviceState(battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY), battery.isCharging)
+        return DeviceState(
+            battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
+            battery.isCharging,
+            if (withMedia) MediaState.current(context) else null,
+        )
     }
 
     fun cornerDrawable(corner: Int): Int = when (corner) {
@@ -133,7 +139,7 @@ object Previews {
             (width - 2 * padding).toInt(),
             (height - 2 * padding).toInt(),
             LocalDateTime.now(),
-            WidgetViews.deviceState(context),
+            WidgetViews.deviceState(context, withMedia = kind == WidgetKind.MUSIC),
         )
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)

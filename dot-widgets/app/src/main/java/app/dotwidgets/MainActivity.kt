@@ -51,6 +51,12 @@ class MainActivity : Activity() {
             })
         }
 
+        if (MusicViews.hasPlaced(this) && !MediaState.hasAccess(this)) {
+            content.addView(Ui.body(this, getString(R.string.music_access_hint), Ui.WHITE).apply { setPadding(0, dp(16), 0, 0) })
+            content.addView(button(getString(R.string.music_access_button)) { MediaState.openAccessSettings(this) })
+            content.addView(Ui.body(this, getString(R.string.music_access_restricted)))
+        }
+
         val manager = AppWidgetManager.getInstance(this)
         val placed = WidgetKind.entries.flatMap { kind -> Scheduler.ids(this, manager, kind).map { kind to it } }
         content.addView(Ui.section(this, R.string.section_my_widgets))

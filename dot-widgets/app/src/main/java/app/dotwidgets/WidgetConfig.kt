@@ -18,6 +18,7 @@ data class WidgetConfig(
     val period: Int = PERIOD_YEAR,
     val text: String = "",
     val targetEpochDay: Long = NO_DATE,
+    val artMode: Int = ART_DOTS,
 ) {
     fun toJson(): String = JSONObject()
         .put("style", style)
@@ -32,6 +33,7 @@ data class WidgetConfig(
         .put("period", period)
         .put("text", text)
         .put("targetEpochDay", targetEpochDay)
+        .put("artMode", artMode)
         .toString()
 
     fun target(): LocalDate =
@@ -53,12 +55,17 @@ data class WidgetConfig(
 
         const val NO_DATE = Long.MIN_VALUE
 
+        const val ART_DOTS = 0
+        const val ART_DOTS_COLOR = 1
+        const val ART_PHOTO = 2
+
         /** Corner radius in dp for each `corner` option. */
         val CORNER_RADII = intArrayOf(0, 12, 24, 36)
 
         fun defaults(kind: WidgetKind): WidgetConfig = when (kind) {
             WidgetKind.NOTE -> WidgetConfig(text = "Hola")
             WidgetKind.COUNTDOWN -> WidgetConfig(text = "Evento")
+            WidgetKind.MUSIC -> WidgetConfig(style = MusicViews.STYLE_LARGE)
             else -> WidgetConfig()
         }
 
@@ -77,6 +84,7 @@ data class WidgetConfig(
                 period = o.optInt("period", fallback.period),
                 text = o.optString("text", fallback.text),
                 targetEpochDay = o.optLong("targetEpochDay", fallback.targetEpochDay),
+                artMode = o.optInt("artMode", fallback.artMode),
             )
         }
     }

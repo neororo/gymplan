@@ -17,6 +17,13 @@
     <string name="note_name">Nota</string>
     <string name="note_desc">Tu propio texto en tipografía de puntos</string>
 
+    <string name="music_name">Música</string>
+    <string name="music_desc">Spotify o cualquier reproductor: carátula de puntos y controles</string>
+    <string name="music_open">Abrir reproductor</string>
+    <string name="music_previous">Anterior</string>
+    <string name="music_play_pause">Reproducir o pausar</string>
+    <string name="music_next">Siguiente</string>
+
     <string name="style_digital">Digital</string>
     <string name="style_stacked">Apilado</string>
     <string name="style_analog">Analógico</string>
@@ -30,6 +37,10 @@
     <string name="style_days">Días</string>
     <string name="style_centered">Centrado</string>
     <string name="style_left">A la izquierda</string>
+
+    <string name="style_compact">Compacto</string>
+    <string name="style_large">Grande</string>
+    <string name="style_cover">Carátula</string>
 
     <string name="section_style">Estilo</string>
     <string name="section_colors">Colores</string>
@@ -63,6 +74,15 @@
     <string name="period_year">Año</string>
     <string name="event_date">Fecha: %1$s</string>
     <string name="text_hint">Escribe aquí</string>
+
+    <string name="section_music">Música</string>
+    <string name="art_dots">Puntos</string>
+    <string name="art_dots_color">Puntos a color</string>
+    <string name="art_photo">Foto</string>
+    <string name="music_access_hint">Para ver lo que suena en Spotify (o en otra app), Dot Widgets necesita acceso a notificaciones. Solo lo usa para leer la música en reproducción.</string>
+    <string name="music_access_restricted">Si el interruptor aparece bloqueado (Android 13+): Ajustes → Apps → Dot Widgets → menú ⋮ → Permitir ajustes restringidos, y vuelve a intentarlo.</string>
+    <string name="music_access_button">Dar acceso</string>
+    <string name="music_access_ok">Acceso a la música activado.</string>
 
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>

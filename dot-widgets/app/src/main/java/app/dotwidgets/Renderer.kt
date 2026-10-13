@@ -5,12 +5,14 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.TextUtils
 import android.text.format.DateFormat
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -29,7 +31,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /** Live values the renderer needs besides the clock. */
-data class DeviceState(val batteryLevel: Int, val charging: Boolean)
+data class DeviceState(val batteryLevel: Int, val charging: Boolean, val media: MediaInfo? = null)
 
 /**
  * Draws a widget's content on a transparent bitmap. The rounded background is drawn separately
@@ -91,6 +93,7 @@ class Renderer(
             WidgetKind.PROGRESS -> progress(canvas, area, now)
             WidgetKind.COUNTDOWN -> countdown(canvas, area, now.toLocalDate())
             WidgetKind.NOTE -> note(canvas, area)
+            WidgetKind.MUSIC -> musicPreview(canvas, area, device.media ?: demoMedia())
         }
         return bitmap
     }
@@ -492,6 +495,204 @@ class Renderer(
             .setLineSpacing(0f, 0.95f)
             .build()
 
+    // ---- Music -------------------------------------------------------------------------------
+
+    enum class Glyph(val cols: Int, val rows: Int, val dots: List<Pair<Int, Int>>) {
+        PLAY(4, 7, column(0, 0..6) + column(1, 1..5) + column(2, 2..4) + column(3, 3..3)),
+        PAUSE(3, 7, column(0, 0..6) + column(2, 0..6)),
+        NEXT(6, 7, column(0, 0..6) + column(1, 1..5) + column(2, 2..4) + column(3, 3..3) + column(5, 0..6)),
+        PREVIOUS(6, 7, column(0, 0..6) + column(2, 3..3) + column(3, 2..4) + column(4, 1..5) + column(5, 0..6)),
+    }
+
+    fun glyph(glyph: Glyph, size: Int): Bitmap {
+        val side = size.coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+        drawGlyph(Canvas(bitmap), glyph, RectF(0f, 0f, side.toFloat(), side.toFloat()), fg)
+        return bitmap
+    }
+
+    private fun drawGlyph(canvas: Canvas, glyph: Glyph, box: RectF, color: Int) {
+        val cell = min(box.width() / 7f, box.height() / 7f)
+        val left = box.centerX() - glyph.cols * cell / 2f
+        val top = box.centerY() - glyph.rows * cell / 2f
+        paint.color = color
+        for ((col, row) in glyph.dots) {
+            canvas.drawCircle(left + cell * (col + 0.5f), top + cell * (row + 0.5f), cell * 0.4f, paint)
+        }
+    }
+
+    fun albumArt(source: Bitmap?, size: Int): Bitmap {
+        val side = size.coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+        drawAlbumArt(Canvas(bitmap), RectF(0f, 0f, side.toFloat(), side.toFloat()), source)
+        return bitmap
+    }
+
+    /** Album art as a halftone of dots (mono or in colour), or the photo with rounded corners. */
+    private fun drawAlbumArt(canvas: Canvas, box: RectF, source: Bitmap?) {
+        val side = min(box.width(), box.height())
+        val left = box.centerX() - side / 2f
+        val top = box.centerY() - side / 2f
+        if (source == null) {
+            val n = 10
+            val cell = side / n
+            paint.color = dim
+            for (r in 0 until n) for (c in 0 until n) {
+                canvas.drawCircle(left + cell * (c + 0.5f), top + cell * (r + 0.5f), cell * 0.18f, paint)
+            }
+            return
+        }
+        if (config.artMode == WidgetConfig.ART_PHOTO) {
+            val radius = side * 0.08f
+            val clip = Path().apply { addRoundRect(RectF(left, top, left + side, top + side), radius, radius, Path.Direction.CW) }
+            canvas.save()
+            canvas.clipPath(clip)
+            canvas.drawBitmap(source, null, RectF(left, top, left + side, top + side), Paint(Paint.FILTER_BITMAP_FLAG))
+            canvas.restore()
+            return
+        }
+        val n = (side / 10f).toInt().coerceIn(14, 28)
+        val small = Bitmap.createScaledBitmap(source, n, n, true)
+        val cell = side / n
+        val darkBackground = luminance(palette.bg) < 0.5
+        for (r in 0 until n) for (c in 0 until n) {
+            val pixel = small.getPixel(c, r)
+            val cx = left + cell * (c + 0.5f)
+            val cy = top + cell * (r + 0.5f)
+            if (config.artMode == WidgetConfig.ART_DOTS_COLOR) {
+                paint.color = pixel or (0xFF shl 24)
+                canvas.drawCircle(cx, cy, cell * 0.42f, paint)
+                continue
+            }
+            val l = luminance(pixel).toFloat()
+            val strength = if (darkBackground) l else 1f - l
+            val radius = cell * 0.5f * sqrt(strength)
+            if (radius < cell * 0.14f) {
+                paint.color = dim
+                canvas.drawCircle(cx, cy, cell * 0.12f, paint)
+            } else {
+                paint.color = fg
+                canvas.drawCircle(cx, cy, radius, paint)
+            }
+        }
+    }
+
+    fun musicInfo(width: Int, height: Int, info: MediaInfo?, access: Boolean, progress: Boolean): Bitmap {
+        val bitmap = Bitmap.createBitmap(width.coerceAtLeast(1), height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        drawMusicInfo(Canvas(bitmap), RectF(0f, 0f, width.toFloat(), height.toFloat()), info, access, progress)
+        return bitmap
+    }
+
+    private fun drawMusicInfo(canvas: Canvas, box: RectF, info: MediaInfo?, access: Boolean, progress: Boolean) {
+        val title: String
+        val subtitle: String
+        when {
+            !access -> {
+                title = "ACTIVA EL ACCESO"
+                subtitle = "Toca para configurar"
+            }
+            info == null -> {
+                title = "NADA SONANDO"
+                subtitle = "Toca play para reanudar"
+            }
+            else -> {
+                title = info.title.uppercase(locale)
+                subtitle = info.artist
+            }
+        }
+        val h = box.height()
+        if (progress) {
+            singleLine(canvas, title, RectF(box.left, box.top + h * 0.06f, box.right, box.top + h * 0.34f), bold, fg)
+            singleLine(canvas, subtitle, RectF(box.left, box.top + h * 0.42f, box.right, box.top + h * 0.6f), light, dim)
+            val fraction = if (info != null && info.durationMs > 0) (info.positionMs.toFloat() / info.durationMs).coerceIn(0f, 1f) else 0f
+            val rowTop = box.top + h * 0.76f
+            val rowH = h * 0.2f
+            val cols = (box.width() / rowH).toInt().coerceIn(10, 40)
+            val filled = (fraction * cols).toInt()
+            for (i in 0 until cols) {
+                paint.color = when {
+                    info == null -> dim
+                    i < filled -> fg
+                    i == filled -> accent
+                    else -> dim
+                }
+                canvas.drawCircle(box.left + box.width() / cols * (i + 0.5f), rowTop + rowH / 2f, min(box.width() / cols, rowH) * 0.34f, paint)
+            }
+        } else {
+            singleLine(canvas, title, RectF(box.left, box.top + h * 0.14f, box.right, box.top + h * 0.5f), bold, fg)
+            singleLine(canvas, subtitle, RectF(box.left, box.top + h * 0.6f, box.right, box.top + h * 0.84f), light, dim)
+        }
+    }
+
+    /** Text sized to the box height, cut with an ellipsis if it is too long. */
+    private fun singleLine(canvas: Canvas, text: String, box: RectF, typeface: Typeface, color: Int) {
+        if (box.width() <= 0f || box.height() <= 0f) return
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.typeface = typeface
+            this.color = color
+            textSize = 100f
+        }
+        textPaint.getTextBounds("HÁg", 0, 3, bounds)
+        textPaint.textSize = 100f * box.height() / bounds.height().coerceAtLeast(1)
+        val shown = TextUtils.ellipsize(text, textPaint, box.width(), TextUtils.TruncateAt.END).toString()
+        val metrics = textPaint.fontMetrics
+        canvas.drawText(shown, box.left, box.centerY() - (metrics.ascent + metrics.descent) / 2f, textPaint)
+    }
+
+    /** All three music styles drawn into one image, for previews (the widget itself uses layouts). */
+    private fun musicPreview(canvas: Canvas, area: RectF, info: MediaInfo) {
+        val gap = area.height() * 0.08f
+        when (config.style) {
+            MusicViews.STYLE_COMPACT -> {
+                val art = RectF(area.left, area.top, area.left + area.height(), area.bottom)
+                drawAlbumArt(canvas, art, info.art)
+                val controlW = min(area.height() * 1.6f, area.width() * 0.35f)
+                val controls = RectF(area.right - controlW, area.top, area.right, area.bottom)
+                drawControls(canvas, controls, info.playing)
+                drawMusicInfo(canvas, RectF(art.right + gap, area.top, controls.left - gap, area.bottom), info, true, false)
+            }
+            MusicViews.STYLE_COVER -> {
+                drawAlbumArt(canvas, area, info.art)
+                val r = min(area.width(), area.height()) * 0.17f
+                paint.color = (palette.bg and 0x00FFFFFF) or (0xD2 shl 24)
+                canvas.drawCircle(area.centerX(), area.centerY(), r, paint)
+                drawGlyph(canvas, if (info.playing) Glyph.PAUSE else Glyph.PLAY, RectF(area.centerX() - r * 0.7f, area.centerY() - r * 0.7f, area.centerX() + r * 0.7f, area.centerY() + r * 0.7f), fg)
+            }
+            else -> {
+                val rowH = area.height() * 0.3f
+                val top = RectF(area.left, area.top, area.right, area.bottom - rowH)
+                val art = RectF(top.left, top.top, top.left + top.height(), top.bottom)
+                drawAlbumArt(canvas, art, info.art)
+                drawMusicInfo(canvas, RectF(art.right + gap, top.top, top.right, top.bottom), info, true, true)
+                drawControls(canvas, RectF(area.left, area.bottom - rowH * 0.9f, area.right, area.bottom), info.playing)
+            }
+        }
+    }
+
+    private fun drawControls(canvas: Canvas, box: RectF, playing: Boolean) {
+        val w = box.width() / 3f
+        val glyphs = listOf(Glyph.PREVIOUS, if (playing) Glyph.PAUSE else Glyph.PLAY, Glyph.NEXT)
+        glyphs.forEachIndexed { i, glyph ->
+            val cx = box.left + w * (i + 0.5f)
+            val half = min(w, box.height()) * 0.38f
+            drawGlyph(canvas, glyph, RectF(cx - half, box.centerY() - half, cx + half, box.centerY() + half), fg)
+        }
+    }
+
+    /** Sample track for previews when nothing is playing: a sun over a horizon, to show the halftone. */
+    private fun demoMedia(): MediaInfo {
+        val size = 48
+        val art = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val c = Canvas(art)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        c.drawColor(0xFF1E2A5A.toInt())
+        p.color = 0xFFFF7A3D.toInt()
+        c.drawCircle(size * 0.5f, size * 0.55f, size * 0.28f, p)
+        p.color = 0xFF0B1020.toInt()
+        c.drawRect(0f, size * 0.68f, size.toFloat(), size.toFloat(), p)
+        return MediaInfo("Canción", "Artista", art, playing = true, positionMs = 72_000, durationMs = 200_000, sessionActivity = null)
+    }
+
     // ---- Helpers -----------------------------------------------------------------------------
 
     /**
@@ -536,8 +737,10 @@ class Renderer(
     private fun RectF.inset(fraction: Float) =
         RectF(left + width() * fraction, top + height() * fraction, right - width() * fraction, bottom - height() * fraction)
 
-    private fun contrastOn(color: Int): Int {
-        val luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
-        return if (luminance > 0.6) Color.BLACK else Color.WHITE
-    }
+    private fun luminance(color: Int): Double =
+        (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255
+
+    private fun contrastOn(color: Int): Int = if (luminance(color) > 0.6) Color.BLACK else Color.WHITE
 }
+
+private fun column(col: Int, rows: IntRange): List<Pair<Int, Int>> = rows.map { col to it }

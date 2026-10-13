@@ -13,6 +13,16 @@ App Android de widgets para la pantalla de inicio en estilo matriz de puntos, in
 | Progreso | Cuadrícula, barra · periodo día / semana / mes / año | Abre el editor |
 | Cuenta atrás | Días hasta (o desde) una fecha con título | Abre el editor |
 | Nota | Texto propio, centrado o a la izquierda | Abre el editor |
+| Música | Compacto, grande, carátula · carátula en puntos, puntos a color o foto | Abre el reproductor; botones ⏮ ⏯ ⏭ |
+
+## Widget de música
+
+Funciona con Spotify y con cualquier reproductor que publique una sesión multimedia (YouTube Music, podcasts…). Lee la sesión activa del sistema, la misma que usan los controles de la pantalla de bloqueo: no hace falta cuenta de Spotify ni clave de API.
+
+- Necesita **acceso a notificaciones** (la app te lleva a esa pantalla). Solo se usa para leer la música en reproducción.
+- Android 13+ bloquea ese permiso en apps instaladas desde un APK. Si el interruptor sale gris: Ajustes → Apps → Dot Widgets → menú ⋮ → **Permitir ajustes restringidos**, y vuelve a activarlo.
+- La canción, la carátula y el estado se actualizan al instante; la barra de progreso avanza cada minuto.
+- Si no suena nada, ▶ reanuda el último reproductor y al tocar el widget se abre Spotify.
 
 ## Personalización
 

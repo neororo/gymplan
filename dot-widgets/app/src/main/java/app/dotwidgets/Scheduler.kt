@@ -25,7 +25,8 @@ object Scheduler {
     private const val PERIODIC_REQUEST = 11
     private const val REFRESH_REQUEST = 12
 
-    private val MINUTE_KINDS = listOf(WidgetKind.CLOCK, WidgetKind.BATTERY)
+    // Music is here only to advance its progress bar; track changes arrive instantly via MediaListenerService.
+    private val MINUTE_KINDS = listOf(WidgetKind.CLOCK, WidgetKind.BATTERY, WidgetKind.MUSIC)
 
     fun refresh(context: Context) {
         val manager = AppWidgetManager.getInstance(context)

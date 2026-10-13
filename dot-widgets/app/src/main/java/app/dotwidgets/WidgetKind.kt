@@ -36,6 +36,10 @@ enum class WidgetKind(
     NOTE(
         NoteWidget::class.java, R.string.note_name, R.string.note_desc,
         listOf(R.string.style_centered, R.string.style_left), 180, 110,
+    ),
+    MUSIC(
+        MusicWidget::class.java, R.string.music_name, R.string.music_desc,
+        listOf(R.string.style_compact, R.string.style_large, R.string.style_cover), 250, 110,
     );
 
     companion object {

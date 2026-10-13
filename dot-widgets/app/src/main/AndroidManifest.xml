@@ -8,6 +8,11 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- So the music widget can open Spotify when nothing is playing. -->
+    <queries>
+        <package android:name="com.spotify.music" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -111,6 +116,33 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_note_info" />
         </receiver>
+
+        <receiver
+            android:name=".MusicWidget"
+            android:exported="true"
+            android:label="@string/music_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_music_info" />
+        </receiver>
+
+        <receiver
+            android:name=".MediaActionReceiver"
+            android:exported="false" />
+
+        <!-- Notification access is what lets Android share the playing media session with this app. -->
+        <service
+            android:name=".MediaListenerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".TickReceiver"
