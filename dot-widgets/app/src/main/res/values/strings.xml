@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dot Widgets</string>
+
+    <string name="clock_name">Reloj de puntos</string>
+    <string name="clock_desc">Hora y fecha en tipografía de matriz de puntos</string>
+    <string name="battery_name">Batería</string>
+    <string name="battery_desc">Anillo de puntos con el nivel de batería</string>
+    <string name="calendar_name">Calendario</string>
+    <string name="calendar_desc">El mes actual con el día de hoy marcado</string>
+    <string name="year_name">Año en puntos</string>
+    <string name="year_desc">Un punto por cada día del año</string>
+
+    <string name="section_theme">TEMA</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dynamic">Material You</string>
+    <string name="section_widgets">WIDGETS</string>
+    <string name="add_widget">Añadir</string>
+    <string name="pin_unsupported">Tu launcher no permite añadir widgets desde la app. Mantén pulsada la pantalla de inicio → Widgets → Dot Widgets.</string>
+    <string name="hint">Mantén pulsada la pantalla de inicio y elige Widgets → Dot Widgets, o pulsa Añadir.</string>
+</resources>

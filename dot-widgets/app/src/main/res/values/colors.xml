@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dot_black">#FF000000</color>
+    <color name="dot_white">#FFFFFFFF</color>
+    <color name="dot_red">#FFD71921</color>
+    <color name="dot_surface">#FF141414</color>
+    <color name="dot_muted">#FF8A8A8A</color>
+</resources>

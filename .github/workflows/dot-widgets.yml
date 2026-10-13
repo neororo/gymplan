@@ -1,0 +1,42 @@
+name: Dot Widgets APK
+
+on:
+  push:
+    paths:
+      - "dot-widgets/**"
+      - ".github/workflows/dot-widgets.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dot-widgets
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK and run lint
+        run: ./gradlew --no-daemon assembleDebug lintDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dot-widgets-apk
+          path: dot-widgets/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dot-widgets-lint
+          path: dot-widgets/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore

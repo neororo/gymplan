@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/dot_black</item>
+        <item name="android:colorAccent">@color/dot_red</item>
+        <item name="android:windowBackground">@color/dot_black</item>
+        <item name="android:statusBarColor">@color/dot_black</item>
+        <item name="android:navigationBarColor">@color/dot_black</item>
+    </style>
+
+    <style name="SectionTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">28dp</item>
+        <item name="android:layout_marginBottom">12dp</item>
+        <item name="android:fontFamily">@font/doto_bold</item>
+        <item name="android:letterSpacing">0.15</item>
+        <item name="android:textColor">@color/dot_red</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="ThemeChoice">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:buttonTint">@color/dot_red</item>
+        <item name="android:textColor">@color/dot_white</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+</resources>
