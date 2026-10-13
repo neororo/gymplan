@@ -121,7 +121,8 @@ class WeatherJob : JobService() {
         fun schedule(context: Context) {
             val scheduler = context.getSystemService(JobScheduler::class.java)
             if (scheduler.getPendingJob(PERIODIC_ID) != null) return
-            scheduler.schedule(
+            submit(
+                context,
                 JobInfo.Builder(PERIODIC_ID, ComponentName(context, WeatherJob::class.java))
                     .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                     .setPeriodic(PERIOD_MS)
@@ -131,11 +132,24 @@ class WeatherJob : JobService() {
         }
 
         fun runNow(context: Context) {
-            context.getSystemService(JobScheduler::class.java).schedule(
+            submit(
+                context,
                 JobInfo.Builder(NOW_ID, ComponentName(context, WeatherJob::class.java))
                     .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                     .build(),
             )
+        }
+
+        /**
+         * Scheduling can be refused by the system (permissions, quotas). That must never take
+         * down a widget receiver, so it is logged and the app carries on.
+         */
+        private fun submit(context: Context, job: JobInfo) {
+            try {
+                context.getSystemService(JobScheduler::class.java).schedule(job)
+            } catch (error: Exception) {
+                CrashLog.record(context, "programar actualización del tiempo", error)
+            }
         }
 
         fun cancel(context: Context) {
@@ -324,10 +338,10 @@ object WeatherUi {
 
     private fun setPlace(context: Context, place: WeatherStore.Place) {
         WeatherStore.setPlace(context, place)
-        Scheduler.update(context, listOf(WidgetKind.WEATHER))
-        Scheduler.refresh(context)
         // Fetch right away rather than waiting for the job.
         Thread { WeatherApi.refresh(context.applicationContext) }.start()
+        Scheduler.update(context, listOf(WidgetKind.WEATHER))
+        Scheduler.refresh(context)
         toast(context, R.string.weather_place_set)
     }
 

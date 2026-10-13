@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Weather: Open-Meteo forecasts, and an optional one-off coarse location from the app. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 14+: required to schedule jobs with a network constraint (WeatherJob). -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- So the music widget can open Spotify when nothing is playing. -->
