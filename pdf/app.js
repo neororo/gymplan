@@ -171,8 +171,12 @@ async function renderRecents() {
 }
 
 /* ── Loading ── */
+// One pdf.js worker for every loaded file; without it each getDocument()
+// starts its own worker thread.
+let pdfWorker = null;
 async function addSource(bytes) {
-  const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  pdfWorker = pdfWorker || new pdfjsLib.PDFWorker();
+  const pdf = await pdfjsLib.getDocument({ data: bytes.slice(), worker: pdfWorker }).promise;
   const src = { bytes, pdf, pages: [] };
   for (let i = 1; i <= pdf.numPages; i++) src.pages.push(await pdf.getPage(i));
   state.sources.push(src);
@@ -203,6 +207,8 @@ async function imagesToPdf(files) {
 }
 
 function resetDoc() {
+  // release the previous document's pages and parsed data in the worker
+  for (const src of state.sources) src.pdf.destroy().catch(() => {});
   state.sources = [];
   state.pages = [];
   state.history = [];

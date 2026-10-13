@@ -1,4 +1,4 @@
-const CACHE = 'pdflow-v5';
+const CACHE = 'pdflow-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -8,27 +8,7 @@ const ASSETS = [
   './vendor/pdf.min.js',
   './vendor/pdf.worker.min.js',
   './vendor/pdf-lib.min.js',
-  './vendor/fontkit.umd.min.js',
-  './fonts/LiberationSans-Regular.ttf',
-  './fonts/LiberationSans-Bold.ttf',
-  './fonts/LiberationSans-Italic.ttf',
-  './fonts/LiberationSans-BoldItalic.ttf',
-  './fonts/LiberationSerif-Regular.ttf',
-  './fonts/LiberationSerif-Bold.ttf',
-  './fonts/LiberationSerif-Italic.ttf',
-  './fonts/LiberationSerif-BoldItalic.ttf',
-  './fonts/LiberationMono-Regular.ttf',
-  './fonts/LiberationMono-Bold.ttf',
-  './fonts/LiberationMono-Italic.ttf',
-  './fonts/LiberationMono-BoldItalic.ttf',
-  './fonts/Carlito-Regular.ttf',
-  './fonts/Carlito-Bold.ttf',
-  './fonts/Carlito-Italic.ttf',
-  './fonts/Carlito-BoldItalic.ttf',
-  './fonts/Caladea-Regular.ttf',
-  './fonts/Caladea-Bold.ttf',
-  './fonts/Caladea-Italic.ttf',
-  './fonts/Caladea-BoldItalic.ttf'
+  './vendor/fontkit.umd.min.js'
 ];
 
 self.addEventListener('install', e => {
@@ -45,6 +25,15 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Fonts are cached the first time a document needs them instead of all at
+  // install, so the first visit does not download every bundled face.
+  if (new URL(e.request.url).pathname.includes('/fonts/')) {
+    e.respondWith(caches.open(CACHE).then(c => c.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+      if (res.ok) c.put(e.request, res.clone());
+      return res;
+    }))));
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('./index.html')))
   );
