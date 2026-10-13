@@ -6,20 +6,10 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
-import java.net.HttpURLConnection
-import java.net.URL
 
 class OpenMeteoTest {
 
-    private val sample = """
-        {"latitude":-33.44,"longitude":-70.65,"timezone":"America/Santiago",
-         "current":{"time":"2026-10-13T11:15","interval":900,"temperature_2m":17.6,"weather_code":2,"is_day":1},
-         "hourly":{"time":["2026-10-13T11:00","2026-10-13T12:00","2026-10-13T13:00"],
-                   "temperature_2m":[17.1,18.9,null],"weather_code":[2,1,0],
-                   "precipitation_probability":[0,null,35],"is_day":[1,1,1]},
-         "daily":{"time":["2026-10-13","2026-10-14"],"weather_code":[2,61],
-                  "temperature_2m_max":[22.4,19.0],"temperature_2m_min":[8.6,10.2]}}
-    """.trimIndent()
+    private val sample = TestData.forecastJson
 
     @Test
     fun parsesForecast() {
@@ -64,11 +54,5 @@ class OpenMeteoTest {
         println("Live geocoding: ${places.take(3)}")
     }
 
-    private fun get(url: String): String {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 15_000
-        assertEquals(200, connection.responseCode)
-        return connection.inputStream.bufferedReader().use { it.readText() }
-    }
+    private fun get(url: String): String = TestData.get(url)
 }

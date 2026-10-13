@@ -129,6 +129,7 @@ class MainActivity : Activity() {
     }
 
     private fun renderMine(placed: List<Pair<WidgetKind, Int>>) {
+        addErrorReport()
         if (!Scheduler.canTickExactly(this) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             content.addView(Ui.body(this, getString(R.string.exact_alarm_hint), Ui.WHITE))
             content.addView(button(getString(R.string.exact_alarm_button)) {
@@ -152,7 +153,7 @@ class MainActivity : Activity() {
             val config = WidgetStore.load(this, id, kind)
             val (w, h) = WidgetViews.sizeDp(manager.getAppWidgetOptions(id), kind)
             val style = getString(kind.styles[config.style.coerceIn(0, kind.styles.size - 1)])
-            content.addView(row(kind, Previews.render(this, kind, config, w, h, dp(140)), style, getString(R.string.edit)) {
+            content.addView(row(kind, Previews.safeRender(this, kind, config, w, h, dp(140)), style, getString(R.string.edit)) {
                 startActivity(ConfigActivity.intent(this, id))
             })
         }
@@ -163,10 +164,43 @@ class MainActivity : Activity() {
         if (Wallpapers.canSet(this)) addWallpaperSection()
     }
 
+    /** Recent errors, copyable, so a problem on the phone can be reported without a computer. */
+    private fun addErrorReport() {
+        val log = CrashLog.read(this)
+        if (log.isEmpty()) return
+        content.addView(Ui.section(this, R.string.section_errors))
+        content.addView(Ui.body(this, getString(R.string.errors_hint), Ui.WHITE))
+        content.addView(TextView(this).apply {
+            text = log.take(1500)
+            textSize = 10f
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextColor(Ui.MUTED)
+            setTextIsSelectable(true)
+            setPadding(0, dp(8), 0, dp(8))
+        })
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(button(getString(R.string.errors_copy)) {
+                val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Dot Widgets", log))
+                Toast.makeText(this@MainActivity, R.string.errors_copied, Toast.LENGTH_SHORT).show()
+            })
+            addView(Button(this@MainActivity).apply {
+                setText(R.string.errors_clear)
+                setTextColor(Ui.MUTED)
+                setBackgroundColor(0)
+                setOnClickListener {
+                    CrashLog.clear(this@MainActivity)
+                    render()
+                }
+            })
+        })
+    }
+
     private fun renderAvailable(placed: List<Pair<WidgetKind, Int>>) {
         content.addView(Ui.body(this, getString(R.string.hint)))
         for (kind in WidgetKind.entries) {
-            val preview = Previews.render(this, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, dp(140))
+            val preview = Previews.safeRender(this, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, dp(140))
             val inUse = placed.count { it.first == kind }
             val note = if (inUse > 0) getString(R.string.in_use, inUse) else getString(kind.description)
             content.addView(row(kind, preview, note, getString(R.string.add_widget)) { pin(kind) })

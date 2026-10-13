@@ -127,6 +127,12 @@
     <string name="hint_mine">Toca Editar para cambiar el estilo, los colores o el tamaño de cada widget.</string>
     <string name="in_use">En tu pantalla: %1$d</string>
 
+    <string name="section_errors">Errores recientes</string>
+    <string name="errors_hint">Algo falló. Copia este texto y envíalo para poder arreglarlo.</string>
+    <string name="errors_copy">Copiar</string>
+    <string name="errors_copied">Copiado</string>
+    <string name="errors_clear">Borrar</string>
+
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>
     <string name="add_widget">Añadir</string>

@@ -66,14 +66,17 @@ object WeatherApi {
     /** Downloads and stores a fresh forecast, then redraws the weather widgets. Blocking. */
     fun refresh(context: Context): Boolean {
         val place = WeatherStore.place(context) ?: return true
-        return try {
+        val data = try {
             val json = get("${OpenMeteo.FORECAST_URL}?${OpenMeteo.forecastQuery(place.latitude, place.longitude)}")
-            WeatherStore.saveData(context, OpenMeteo.parseForecast(json, place.name, System.currentTimeMillis()))
-            Scheduler.update(context, listOf(WidgetKind.WEATHER))
-            true
-        } catch (e: Exception) {
-            false
+            OpenMeteo.parseForecast(json, place.name, System.currentTimeMillis())
+        } catch (error: Throwable) {
+            CrashLog.record(context, "descarga del tiempo", error)
+            return false
         }
+        WeatherStore.saveData(context, data)
+        // Drawing errors are handled (and logged) per widget by WidgetViews.build.
+        Scheduler.update(context, listOf(WidgetKind.WEATHER))
+        return true
     }
 
     fun search(query: String): List<OpenMeteo.Place> {

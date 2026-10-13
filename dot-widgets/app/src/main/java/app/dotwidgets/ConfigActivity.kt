@@ -252,7 +252,7 @@ class ConfigActivity : Activity() {
 
     private fun updatePreview() {
         val maxWidth = resources.displayMetrics.widthPixels - dp(32)
-        preview.setImageBitmap(Previews.render(this, kind, config, previewWidthDp, previewHeightDp, maxWidth))
+        preview.setImageBitmap(Previews.safeRender(this, kind, config, previewWidthDp, previewHeightDp, maxWidth))
     }
 
     private fun save() {

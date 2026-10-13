@@ -13,8 +13,8 @@ android {
         applicationId = "app.dotwidgets"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.6.0"
+        versionCode = 9
+        versionName = "0.6.1"
     }
 
     // Fixed debug key so each CI-built APK installs over the previous one. Not a secret:
@@ -34,6 +34,10 @@ android {
         }
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -50,6 +54,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     // Real org.json for JVM unit tests (android.jar only ships stubs).
     testImplementation("org.json:json:20240303")
+    // Runs the real widget drawing code on the JVM (smoke test).
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
 
 tasks.withType<Test>().configureEach {

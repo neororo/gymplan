@@ -55,7 +55,36 @@ object WidgetViews {
     private const val MAX_PIXELS = 180_000f
     private const val PADDING_DP = 12
 
-    fun build(context: Context, manager: AppWidgetManager, id: Int, kind: WidgetKind): RemoteViews {
+    /** Never throws: a widget that fails to draw shows the error instead of crashing the app. */
+    fun build(context: Context, manager: AppWidgetManager, id: Int, kind: WidgetKind): RemoteViews =
+        try {
+            buildOrThrow(context, manager, id, kind)
+        } catch (error: Throwable) {
+            CrashLog.record(context, "widget ${kind.name}", error)
+            errorViews(context, kind, error)
+        }
+
+    private fun errorViews(context: Context, kind: WidgetKind, error: Throwable): RemoteViews {
+        val density = context.resources.displayMetrics.density
+        val width = (220 * density).toInt()
+        val height = (90 * density).toInt()
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFD71921.toInt(); textSize = 16 * density }
+        canvas.drawText("ERROR · ${kind.name}", 0f, 18 * density, paint)
+        paint.color = 0xFFFFFFFF.toInt()
+        paint.textSize = 11 * density
+        val lines = listOf(error.javaClass.simpleName) + (error.message ?: "").chunked(38).take(3) +
+            listOf("Abre Dot Widgets para ver el detalle")
+        lines.forEachIndexed { i, line -> canvas.drawText(line, 0f, (36 + i * 14) * density, paint) }
+        return RemoteViews(context.packageName, R.layout.widget_image).apply {
+            setInt(R.id.bg, "setColorFilter", 0xFF000000.toInt())
+            setImageViewBitmap(R.id.content, bitmap)
+            setOnClickPendingIntent(R.id.root, activity(context, 999, Intent(context, MainActivity::class.java)))
+        }
+    }
+
+    private fun buildOrThrow(context: Context, manager: AppWidgetManager, id: Int, kind: WidgetKind): RemoteViews {
         val config = WidgetStore.load(context, id, kind)
         val palette = Palettes.find(context, config.palette)
         if (kind == WidgetKind.MUSIC) return MusicViews.build(context, manager.getAppWidgetOptions(id), id, config, palette)
@@ -141,6 +170,17 @@ object WidgetViews {
 
 /** Renders a widget the way it looks on the home screen, background included, for in-app previews. */
 object Previews {
+    /** Like [render], but a failure becomes a logged, blank preview instead of crashing the screen. */
+    fun safeRender(context: Context, kind: WidgetKind, config: WidgetConfig, widthDp: Int, heightDp: Int, maxWidthPx: Int): Bitmap =
+        try {
+            render(context, kind, config, widthDp, heightDp, maxWidthPx)
+        } catch (error: Throwable) {
+            CrashLog.record(context, "vista previa ${kind.name}", error)
+            Bitmap.createBitmap(maxWidthPx.coerceAtLeast(1), (maxWidthPx / 2).coerceAtLeast(1), Bitmap.Config.ARGB_8888).apply {
+                eraseColor(0xFF2A0000.toInt())
+            }
+        }
+
     fun render(context: Context, kind: WidgetKind, config: WidgetConfig, widthDp: Int, heightDp: Int, maxWidthPx: Int): Bitmap {
         val density = context.resources.displayMetrics.density
         val fit = min(1f, maxWidthPx / (widthDp * density))
