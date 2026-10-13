@@ -870,6 +870,12 @@ class Renderer(
     }
 
     private fun weatherNow(canvas: Canvas, area: RectF, data: WeatherData) {
+        // Wide and short (e.g. 4x1): one row, icon | temperature | place, condition and range.
+        if (area.width() >= area.height() * WIDE_RATIO) {
+            val rowH = min(area.height() * 0.9f, area.width() / 5f)
+            weatherHeader(canvas, RectF(area.left, area.centerY() - rowH / 2f, area.right, area.centerY() + rowH / 2f), data, tempWidth = 2.4f)
+            return
+        }
         val h = area.height()
         fitText(canvas, data.place.uppercase(locale), RectF(area.left, area.top, area.right, area.top + h * 0.14f), bold, secondary, Paint.Align.LEFT, "MMMMMMMMMMMM")
         val iconSide = h * 0.42f
@@ -885,10 +891,10 @@ class Renderer(
     }
 
     /** Big current conditions across the top, used by the hourly and weekly styles. */
-    private fun weatherHeader(canvas: Canvas, box: RectF, data: WeatherData) {
+    private fun weatherHeader(canvas: Canvas, box: RectF, data: WeatherData, tempWidth: Float = 1.7f) {
         val iconBox = RectF(box.left, box.top, box.left + box.height(), box.bottom)
         drawWeatherIcon(canvas, iconBox, data.now.code, data.now.isDay)
-        val tempRight = iconBox.right + box.height() * 1.7f
+        val tempRight = iconBox.right + box.height() * tempWidth
         fitText(canvas, degrees(data.now.temp), RectF(iconBox.right + box.height() * 0.15f, box.top, tempRight, box.bottom), bold, fg, Paint.Align.LEFT, "-00°")
         val textLeft = tempRight + box.height() * 0.15f
         fitText(canvas, data.place.uppercase(locale), RectF(textLeft, box.top, box.right, box.top + box.height() * 0.3f), bold, secondary, Paint.Align.RIGHT, "MMMMMMMMMMMM")
@@ -1289,5 +1295,8 @@ class Renderer(
 }
 
 private const val MAX_TITLE_PAGES = 5
+
+/** Width/height ratio from which the weather "Ahora" style switches to its single-row layout. */
+private const val WIDE_RATIO = 2.2f
 
 private fun column(col: Int, rows: IntRange): List<Pair<Int, Int>> = rows.map { col to it }

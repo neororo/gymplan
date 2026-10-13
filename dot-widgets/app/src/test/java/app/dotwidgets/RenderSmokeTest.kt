@@ -21,7 +21,8 @@ class RenderSmokeTest {
 
     private val context: Context get() = RuntimeEnvironment.getApplication()
 
-    private val sizes = listOf(110 to 110, 250 to 110, 340 to 180, 180 to 180, 80 to 40, 400 to 400)
+    // Includes wide 4x1 shapes (e.g. the weather "Ahora" single-row layout).
+    private val sizes = listOf(110 to 110, 250 to 110, 340 to 180, 180 to 180, 80 to 40, 400 to 400, 340 to 70, 250 to 60)
 
     private fun configsFor(kind: WidgetKind): List<WidgetConfig> {
         val base = WidgetConfig.defaults(kind)
