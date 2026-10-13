@@ -23,6 +23,8 @@ const state = {
   tool: 'select',
   color: COLORS[0],
   textSize: 14,
+  textFont: { family: 'sans', std: true, bold: false, italic: false },
+  textFontAuto: true,
   pendingImage: null,
   history: [],
   query: '',
@@ -211,6 +213,7 @@ function resetDoc() {
   thumbCache = new Map();
   textCache.clear();
   sepCache.clear();
+  state.textFontAuto = true;
 }
 
 async function loadDocument(items) {
@@ -378,6 +381,7 @@ async function renderPage(n) {
   const textContent = await page.getTextContent();
   await pdfjsLib.renderTextLayer({ textContentSource: textContent, container: tl, viewport: vp }).promise;
   markHits(tl);
+  if (n === 0) matchDocumentFont(p);
 }
 
 function markHits(tl) {
@@ -463,9 +467,9 @@ function buildThumbs() {
 // Families used for replaced text. The bundled fonts are metric-compatible
 // with the common Office/PDF fonts, so edited lines keep their width.
 const FONT_FAMILIES = {
-  sans:    { file: 'LiberationSans',  css: 'Arial, Helvetica, sans-serif',      std: 0 },
-  serif:   { file: 'LiberationSerif', css: '"Times New Roman", Times, serif',   std: 1 },
-  mono:    { file: 'LiberationMono',  css: '"Courier New", Courier, monospace', std: 2 },
+  sans:    { file: 'LiberationSans',  css: 'Helvetica, Arial, sans-serif',              std: 0 },
+  serif:   { file: 'LiberationSerif', css: 'Times, "Times New Roman", serif',           std: 1 },
+  mono:    { file: 'LiberationMono',  css: '"Courier New", Courier, monospace',         std: 2 },
   calibri: { file: 'Carlito',         css: 'Calibri, sans-serif',               std: 0 },
   cambria: { file: 'Caladea',         css: 'Cambria, serif',                    std: 1 },
 };
@@ -479,9 +483,15 @@ const DEFAULT_FONT = { family: 'sans', bold: false, italic: false };
 const styleIndex = f => (f.bold ? 1 : 0) + (f.italic ? 2 : 0);
 const fontFile = (f = DEFAULT_FONT) => `fonts/${FONT_FAMILIES[f.family].file}-${STYLE_SUFFIX[styleIndex(f)]}.ttf`;
 const stdFontName = (f = DEFAULT_FONT) => STD_FONTS[FONT_FAMILIES[f.family].std][styleIndex(f)];
-const familyCss = (f = DEFAULT_FONT) => `"PF ${FONT_FAMILIES[f.family].file}", ${FONT_FAMILIES[f.family].css}`;
+// f.std = the text uses one of the 14 standard PDF fonts (Courier, Helvetica,
+// Times): it is written back with that same standard font, and shown with
+// the system face first, like pdf.js does. The bundled face is the fallback.
+const familyCss = (f = DEFAULT_FONT) => {
+  const { file, css } = FONT_FAMILIES[f.family];
+  return f.std ? css.replace(/, (sans-serif|serif|monospace)$/, `, "PF ${file}", $1`) : `"PF ${file}", ${css}`;
+};
 const fontCss = (f = DEFAULT_FONT, px) => `${f.italic ? 'italic ' : ''}${f.bold ? 700 : 400} ${px}px ${familyCss(f)}`;
-const sameFont = (a, b) => a.family === b.family && !!a.bold === !!b.bold && !!a.italic === !!b.italic;
+const sameFont = (a, b) => a.family === b.family && !!a.std === !!b.std && !!a.bold === !!b.bold && !!a.italic === !!b.italic;
 
 const fontBytes = new Map();
 function loadFontBytes(f) {
@@ -566,7 +576,7 @@ function annotElement(a, vp, R) {
   if (a.type === 'edit') {
     // replaced line: cover the original, then write each formatted run on top
     el = svgEl('g', {});
-    el.appendChild(svgEl('rect', { ...rectBox(vp, a.x1, a.y1, Math.max(a.x2, a.x + (a.tw || 0) + 1), a.y2), fill: a.bg }));
+    el.appendChild(svgEl('rect', { ...rectBox(vp, Math.min(a.x1, a.x - 1), a.y1, Math.max(a.x2, a.x + (a.tw || 0) + 1), a.y2), fill: a.bg }));
     if (!a._editing) {
       const g = svgEl('g', turn ? { transform: `rotate(${turn} ${ax} ${ay})` } : {});
       let cx = 0;
@@ -692,6 +702,8 @@ function detectFont(page, fontId, style) {
     family,
     bold: /bold|black|heavy|semibold|demi|extrab/.test(n) || !!obj?.bold || !!obj?.black,
     italic: /italic|oblique|-it$|kursiv/.test(n) || !!obj?.italic,
+    // not embedded in the file: viewers draw it with the standard PDF font
+    std: !!obj?.missingFile && ['sans', 'serif', 'mono'].includes(family),
   };
 }
 
@@ -820,6 +832,13 @@ async function textItems(p) {
     l.y2 = Math.max(...runs.map(r => r.y + r.size * 0.92));
     return l;
   });
+  // right-aligned cells (amounts in a column): the right edge lines up with
+  // a neighbouring line while the left edge does not
+  for (const l of result) {
+    const size = Math.max(...l.runs.map(r => r.size));
+    l.align = result.some(o => o !== l && Math.abs(o.y - l.y) < size * 4 &&
+      Math.abs(o.x2 - l.x2) < 1 && Math.abs(o.x1 - l.x1) > 1) ? 'right' : 'left';
+  }
   textCache.set(key, result);
   return result;
 }
@@ -856,6 +875,41 @@ function sampleColors(n, box) {
   }
   const hex = v => '#' + v.map(q => q.toString(16).padStart(2, '0')).join('');
   return { bg: hex(bg), fg: far > 90 ? hex(fg) : '#000000' };
+}
+
+// Vertical extent of the cover for a line: generous enough for accents and
+// descenders, but it stops at shaded bands or rules touching the text (rows
+// that are mostly one colour other than the background). PDF coordinates.
+function fitCover(n, vp, x1, x2, base, top, bottom, bg) {
+  const c = $(`.page[data-n="${n}"] canvas`);
+  if (!c || vp.rotation % 360 !== 0) return [bottom, top];
+  const k = c.width / parseFloat(c.parentElement.style.width);
+  const [vx1, vTop] = vp.convertToViewportPoint(x1, top);
+  const [vx2, vBot] = vp.convertToViewportPoint(x2, bottom);
+  const vBase = vp.convertToViewportPoint(x1, base)[1];
+  const X = Math.max(0, Math.floor(vx1 * k)), Y = Math.max(0, Math.floor(vTop * k));
+  const w = Math.min(c.width - X, Math.ceil((vx2 - vx1) * k)), h = Math.min(c.height - Y, Math.ceil((vBot - vTop) * k));
+  if (w < 2 || h < 2) return [bottom, top];
+  let data;
+  try { data = c.getContext('2d').getImageData(X, Y, w, h).data; } catch { return [bottom, top]; }
+  const B = [1, 3, 5].map(i => parseInt(bg.slice(i, i + 2), 16));
+  const dist = (i, C) => Math.abs(data[i] - C[0]) + Math.abs(data[i + 1] - C[1]) + Math.abs(data[i + 2] - C[2]);
+  const foreign = row => {
+    let n = 0; const m = [0, 0, 0];
+    for (let x = 0; x < w; x++) { const i = (row * w + x) * 4; if (dist(i, B) > 48) { n++; m[0] += data[i]; m[1] += data[i + 1]; m[2] += data[i + 2]; } }
+    if (n < w * 0.6) return false;
+    const M = m.map(v => v / n);
+    let same = 0;
+    for (let x = 0; x < w; x++) if (dist((row * w + x) * 4, M) < 40) same++;
+    return same > w * 0.55;
+  };
+  const baseRow = clamp(Math.round(vBase * k) - Y, 0, h - 1);
+  let r0 = 0, r1 = h - 1;
+  for (let r = baseRow - 1; r >= 0; r--) if (foreign(r)) { r0 = r + 1; break; }
+  for (let r = baseRow; r < h; r++) if (foreign(r)) { r1 = r - 1; break; }
+  const yTop = vp.convertToPdfPoint(vx1, (Y + r0) / k)[1];
+  const yBot = vp.convertToPdfPoint(vx1, (Y + r1 + 1) / k)[1];
+  return [Math.min(yBot, base - 0.5), Math.max(yTop, base + 1)];
 }
 
 function showHover(svg, n, e) {
@@ -1025,11 +1079,12 @@ function openTextInput(n, vx, vy) {
   const p = state.pages[n];
   const vp = viewportOf(p);
   const size = state.textSize;
+  const font = { ...state.textFont };
   const color = state.color === '#ffd400' ? '#111111' : state.color;
-  openEditor(n, { left: vx, top: vy, size, color }, text => {
+  openEditor(n, { left: vx, top: vy, size, font, color }, text => {
     if (!text) return;
     const [x, y] = vp.convertToPdfPoint(vx + 5.5, vy + 3.5 + size * 0.92 * vp.scale);
-    addAnnot(n, { type: 'text', text, size, font: DEFAULT_FONT, color, x, y, r0: totalRot(p) });
+    addAnnot(n, { type: 'text', text, size, font, color, x, y, r0: totalRot(p) });
   });
 }
 
@@ -1062,6 +1117,7 @@ function reopenText(n, a) {
 function layoutRuns(a) {
   for (const r of a.runs) r.w = textWidthPt(r.text, r.size, r.font) * r.hs;
   a.tw = a.runs.reduce((t, r) => t + r.w, 0);
+  if (a.align === 'right') a.x = a.right - a.tw;
 }
 
 // Contenteditable line editor: one span per run, so typing inside a run keeps
@@ -1108,7 +1164,7 @@ function openRichEditor(n, a, clientPt, done) {
       const runEl = el.closest('[data-run]');
       const base = a.runs[runEl ? +runEl.dataset.run : 0];
       const cs = getComputedStyle(el);
-      const font = { family: base.font.family, bold: parseInt(cs.fontWeight, 10) >= 600, italic: cs.fontStyle !== 'normal' };
+      const font = { family: base.font.family, std: base.font.std, bold: parseInt(cs.fontWeight, 10) >= 600, italic: cs.fontStyle !== 'normal' };
       const color = rgbToHex(cs.color);
       const last = out[out.length - 1];
       if (last && sameFont(last.font, font) && last.color === color && last.size === base.size && last.dy === base.dy && last.hs === base.hs) last.text += text;
@@ -1164,7 +1220,16 @@ async function editLineAt(n, vx, vy, clientPt) {
     if (Math.abs(r.hs - 1) < 0.03) r.hs = 1;
     delete r.w0;
   }
-  const a = { type: 'edit', x: l.x1, y: l.y, x1: l.x1 - 1, y1: l.y1, x2: l.x2 + 1, y2: l.y2, bg, runs, r0: 0 };
+  const size = Math.max(...l.runs.map(r => r.size));
+  let [y1, y2] = fitCover(n, vp, l.x1 - 1, l.x2 + 1, l.y, l.y + size * 1.0, l.y - size * 0.32, bg);
+  // never reach into the glyphs of the lines just above or below
+  for (const o of lines) {
+    if (o === l || o.x1 >= l.x2 || o.x2 <= l.x1) continue;
+    const os = Math.max(...o.runs.map(r => r.size));
+    if (o.y < l.y && o.y > l.y - size * 2.5) y1 = Math.max(y1, o.y + os * 0.8);
+    if (o.y > l.y && o.y < l.y + size * 2.5) y2 = Math.min(y2, o.y - os * 0.25);
+  }
+  const a = { type: 'edit', x: l.x1, y: l.y, x1: l.x1 - 1, y1, x2: l.x2 + 1, y2, bg, runs, r0: 0, align: l.align, right: l.x2 };
   layoutRuns(a);
   openRichEditor(n, a, clientPt, newRuns => {
     if (!newRuns) return;
@@ -1172,6 +1237,42 @@ async function editLineAt(n, vx, vy, clientPt) {
     layoutRuns(a);
     addAnnot(n, a);
   });
+}
+
+/* ── Font for new text ── */
+const TEXT_FONTS = {
+  helvetica: { family: 'sans', std: true },
+  times:     { family: 'serif', std: true },
+  courier:   { family: 'mono', std: true },
+  arial:     { family: 'sans', std: false },
+  calibri:   { family: 'calibri', std: false },
+  cambria:   { family: 'cambria', std: false },
+};
+const textFontKey = f => Object.keys(TEXT_FONTS).find(k => TEXT_FONTS[k].family === f.family && TEXT_FONTS[k].std === !!f.std) ||
+  ({ sans: 'helvetica', serif: 'times', mono: 'courier' })[f.family] || 'helvetica';
+
+function setTextFont(f, auto = false) {
+  state.textFont = { family: f.family, std: !!f.std, bold: !!f.bold, italic: false };
+  state.textFontAuto = auto;
+  $('#textFont').value = textFontKey(state.textFont);
+  $('#boldBtn').classList.toggle('on', state.textFont.bold);
+  ensureFace(state.textFont);
+}
+
+// New text defaults to the font most of the document's first page is set in.
+async function matchDocumentFont(p) {
+  if (!state.textFontAuto) return;
+  const page = pdfPage(p);
+  const count = new Map();
+  for (const l of await textItems(p)) {
+    for (const r of l.runs) {
+      const f = detectFont(page, r.fontId, r.style);
+      const key = textFontKey(f);
+      count.set(key, (count.get(key) || 0) + r.str.length);
+    }
+  }
+  const best = [...count].sort((a, b) => b[1] - a[1])[0];
+  if (best && state.textFontAuto) setTextFont(TEXT_FONTS[best[0]], true);
 }
 
 /* ── Images ── */
@@ -1369,9 +1470,9 @@ async function buildPdf(pageList = state.pages) {
   if (hasFontkit) out.registerFontkit(fontkit);
   const fonts = new Map();
   const getFont = (f = DEFAULT_FONT) => {
-    const key = fontFile(f);
+    const key = f.std ? stdFontName(f) : fontFile(f);
     if (!fonts.has(key)) fonts.set(key, (async () => {
-      const bytes = hasFontkit ? await loadFontBytes(f) : null;
+      const bytes = hasFontkit && !f.std ? await loadFontBytes(f) : null;
       let font = null;
       if (bytes) { try { font = await out.embedFont(bytes, { subset: true }); } catch (err) { console.warn(err); } }
       font = font || await out.embedFont(stdFontName(f));
@@ -1407,15 +1508,20 @@ async function buildPdf(pageList = state.pages) {
       if (a.type === 'whiteout') {
         page.drawRectangle({ x: Math.min(a.x1, a.x2), y: Math.min(a.y1, a.y2), width: Math.abs(a.x2 - a.x1), height: Math.abs(a.y2 - a.y1), color: hexToRgb(a.color) });
       } else if (a.type === 'edit') {
-        let cx = a.x;
         const placed = [];
+        let total = 0;
         for (const r of a.runs) {
           const font = await getFont(r.font);
           const text = font.safe(r.text);
-          placed.push({ r, font, text, x: cx });
-          cx += font.widthOfTextAtSize(text, r.size) * r.hs;
+          const w = font.widthOfTextAtSize(text, r.size) * r.hs;
+          placed.push({ r, font, text, w });
+          total += w;
         }
-        page.drawRectangle({ x: a.x1, y: a.y1, width: Math.max(a.x2, cx + 1) - a.x1, height: a.y2 - a.y1, color: hexToRgb(a.bg) });
+        const start = a.align === 'right' ? a.right - total : a.x;
+        let cx = start;
+        for (const pl of placed) { pl.x = cx; cx += pl.w; }
+        const left = Math.min(a.x1, start - 1);
+        page.drawRectangle({ x: left, y: a.y1, width: Math.max(a.x2, cx + 1) - left, height: a.y2 - a.y1, color: hexToRgb(a.bg) });
         for (const { r, font, text, x } of placed) {
           if (r.hs !== 1) page.pushOperators(pushGraphicsState(), concatTransformationMatrix(r.hs, 0, 0, 1, x * (1 - r.hs), 0));
           page.drawText(text, { x, y: a.y + r.dy, size: r.size, font, color: hexToRgb(r.color) });
@@ -1704,6 +1810,8 @@ if (embedded) $('[data-action="print"]').hidden = true;
 ensureFace(DEFAULT_FONT);
 buildSwatches();
 $('#textSize').addEventListener('change', e => { state.textSize = +e.target.value; });
+$('#textFont').addEventListener('change', e => setTextFont({ ...TEXT_FONTS[e.target.value], bold: state.textFont.bold }));
+$('#boldBtn').addEventListener('click', () => setTextFont({ ...state.textFont, bold: !state.textFont.bold }));
 updateUndo();
 renderRecents();
 

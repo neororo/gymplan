@@ -145,6 +145,7 @@
   .pages[data-tool="edit"] svg.overlay [data-i] { cursor: text; }
   svg.overlay .hover-box { fill: color-mix(in srgb, var(--accent) 8%, transparent); stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 4 3; pointer-events: none; }
   svg.overlay .handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: nwse-resize !important; }
+  .bold-btn { font-weight: 800; font-size: 1rem; font-family: Georgia, serif; }
   .size-sel { padding: 5px 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); color: var(--text); font: inherit; font-size: .85rem; flex-shrink: 0; }
   .page .num { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: .72rem; color: var(--muted); }
   .text-input.rich { white-space: pre; resize: none; cursor: text; }
@@ -294,6 +295,11 @@
       <button class="icon-btn" data-action="undo" id="undoBtn" title="Deshacer (Ctrl+Z)"><svg class="i"><use href="#i-undo"/></svg></button>
       <div class="sep"></div>
       <div id="swatches" style="display:flex;align-items:center"></div>
+      <select id="textFont" class="size-sel" title="Fuente del texto nuevo" aria-label="Fuente del texto nuevo">
+        <option value="helvetica">Helvetica</option><option value="times">Times</option><option value="courier">Courier</option>
+        <option value="arial">Arial</option><option value="calibri">Calibri</option><option value="cambria">Cambria</option>
+      </select>
+      <button class="icon-btn bold-btn" id="boldBtn" title="Negrita para el texto nuevo" aria-label="Negrita">B</button>
       <select id="textSize" class="size-sel" title="Tamaño del texto" aria-label="Tamaño del texto">
         <option>8</option><option>10</option><option>12</option><option selected>14</option><option>18</option><option>24</option><option>32</option><option>48</option>
       </select>
