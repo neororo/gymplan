@@ -62,6 +62,9 @@ class MainActivity : Activity() {
 
         if (Wallpapers.canSet(this)) addWallpaperSection()
 
+        content.addView(Ui.section(this, R.string.section_weather))
+        content.addView(WeatherUi.section(this) { render() })
+
         val manager = AppWidgetManager.getInstance(this)
         val placed = WidgetKind.entries.flatMap { kind -> Scheduler.ids(this, manager, kind).map { kind to it } }
         content.addView(Ui.section(this, R.string.section_my_widgets))
@@ -81,6 +84,11 @@ class MainActivity : Activity() {
             val preview = Previews.render(this, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, dp(140))
             content.addView(row(kind, preview, getString(R.string.add_widget)) { pin(kind) })
         }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        WeatherUi.onPermissionResult(this, requestCode, grantResults)
     }
 
     /** Plain wallpapers (black by default) so the widgets stand out on the home screen. */

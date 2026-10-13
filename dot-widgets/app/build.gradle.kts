@@ -13,8 +13,8 @@ android {
         applicationId = "app.dotwidgets"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.4.1"
+        versionCode = 7
+        versionName = "0.5.0"
     }
 
     // Fixed debug key so each CI-built APK installs over the previous one. Not a secret:
@@ -43,5 +43,18 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    // Real org.json for JVM unit tests (android.jar only ships stubs).
+    testImplementation("org.json:json:20240303")
+}
+
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
     }
 }

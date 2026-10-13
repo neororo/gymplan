@@ -13,11 +13,22 @@ App Android de widgets para la pantalla de inicio en estilo matriz de puntos, in
 | Progreso | Cuadrícula, barra · periodo día / semana / mes / año | Abre el editor |
 | Cuenta atrás | Días hasta (o desde) una fecha con título | Abre el editor |
 | Nota | Texto propio, centrado o a la izquierda | Abre el editor |
+| Tiempo | Ahora, por horas, semana · °C o °F | Actualiza el pronóstico |
 | Música | Compacto, grande, carátula · carátula en puntos, puntos a color o foto | Abre el reproductor; botones ⏮ ⏯ ⏭ |
 
 ## Fondo de pantalla
 
 En la app, la sección **Fondo de pantalla** pone un fondo liso para que los widgets resalten: negro, negro con puntos, grafito o claro con puntos. Se puede aplicar a inicio, bloqueo o ambos. La app no puede guardar una copia del fondo anterior; **Restaurar el fondo predeterminado** vuelve al de fábrica.
+
+## Widget del tiempo
+
+Usa [Open-Meteo](https://open-meteo.com) (gratis, sin cuenta ni clave; datos bajo CC BY 4.0, citado en la app).
+
+- **Ubicación**, compartida por todos los widgets del tiempo: busca tu ciudad (sin permisos) o pulsa **Usar mi ubicación**, que pide la ubicación aproximada una sola vez con la app abierta. No se usa ubicación en segundo plano.
+- Se actualiza cada ~30 minutos cuando hay internet (JobScheduler, agrupado por el sistema), al tocar el widget y al cambiar de ubicación.
+- Sin conexión muestra los últimos datos; si tienen más de 90 minutos, indica la hora (`act. 10:30`).
+- Iconos de puntos para despejado (sol o luna), parcial, nublado, niebla, llovizna, lluvia, nieve y tormenta.
+- CI prueba el lector de datos contra la API real en cada compilación.
 
 ## Widget de música
 

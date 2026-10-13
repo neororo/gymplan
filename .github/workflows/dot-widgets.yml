@@ -23,8 +23,11 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK and run lint
-        run: ./gradlew --no-daemon assembleDebug lintDebug
+      - name: Build debug APK, run lint and unit tests
+        # LIVE_API=1 lets the weather parser test hit the real Open-Meteo API.
+        env:
+          LIVE_API: "1"
+        run: ./gradlew --no-daemon assembleDebug lintDebug testDebugUnitTest
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

@@ -40,6 +40,10 @@ enum class WidgetKind(
     MUSIC(
         MusicWidget::class.java, R.string.music_name, R.string.music_desc,
         listOf(R.string.style_compact, R.string.style_large, R.string.style_cover), 250, 110,
+    ),
+    WEATHER(
+        WeatherWidget::class.java, R.string.weather_name, R.string.weather_desc,
+        listOf(R.string.style_now, R.string.style_hourly, R.string.style_week), 180, 180,
     );
 
     companion object {

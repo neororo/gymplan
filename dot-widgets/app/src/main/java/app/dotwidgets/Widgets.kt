@@ -48,6 +48,7 @@ class YearWidget : KindWidget(WidgetKind.PROGRESS)
 class CountdownWidget : KindWidget(WidgetKind.COUNTDOWN)
 class NoteWidget : KindWidget(WidgetKind.NOTE)
 class MusicWidget : KindWidget(WidgetKind.MUSIC)
+class WeatherWidget : KindWidget(WidgetKind.WEATHER)
 
 object WidgetViews {
     // RemoteViews cross binder (~1 MB transaction limit), so keep the bitmap under ~720 KB.
@@ -59,7 +60,13 @@ object WidgetViews {
         val palette = Palettes.find(context, config.palette)
         if (kind == WidgetKind.MUSIC) return MusicViews.build(context, manager.getAppWidgetOptions(id), id, config, palette)
         val (width, height) = contentSize(context, manager.getAppWidgetOptions(id), kind)
-        val bitmap = Renderer(context, config, palette).render(kind, width, height, LocalDateTime.now(), deviceState(context))
+        val bitmap = Renderer(context, config, palette).render(
+            kind,
+            width,
+            height,
+            LocalDateTime.now(),
+            deviceState(context, withWeather = kind == WidgetKind.WEATHER),
+        )
         return RemoteViews(context.packageName, R.layout.widget_image).apply {
             setImageViewResource(R.id.bg, cornerDrawable(config.corner))
             setInt(R.id.bg, "setColorFilter", palette.bg)
@@ -69,12 +76,14 @@ object WidgetViews {
         }
     }
 
-    fun deviceState(context: Context, withMedia: Boolean = false): DeviceState {
+    fun deviceState(context: Context, withMedia: Boolean = false, withWeather: Boolean = false): DeviceState {
         val battery = context.getSystemService(BatteryManager::class.java)
         return DeviceState(
             battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
             battery.isCharging,
-            if (withMedia) MediaState.current(context) else null,
+            media = if (withMedia) MediaState.current(context) else null,
+            weather = if (withWeather) WeatherStore.data(context) else null,
+            weatherPlaceSet = !withWeather || WeatherStore.place(context) != null,
         )
     }
 
@@ -105,6 +114,12 @@ object WidgetViews {
         WidgetKind.CLOCK -> activity(context, id, Intent(AlarmClock.ACTION_SHOW_ALARMS))
         // Tapping refreshes right away; otherwise the level updates once a minute.
         WidgetKind.BATTERY -> Scheduler.refreshIntent(context)
+        WidgetKind.WEATHER ->
+            if (WeatherStore.place(context) == null) {
+                activity(context, id, Intent(context, MainActivity::class.java))
+            } else {
+                WeatherRefreshReceiver.pending(context)
+            }
         WidgetKind.CALENDAR, WidgetKind.DATE -> {
             val uri = CalendarContract.CONTENT_URI.buildUpon()
                 .appendPath("time")
@@ -139,7 +154,7 @@ object Previews {
             (width - 2 * padding).toInt(),
             (height - 2 * padding).toInt(),
             LocalDateTime.now(),
-            WidgetViews.deviceState(context, withMedia = kind == WidgetKind.MUSIC),
+            WidgetViews.deviceState(context, withMedia = kind == WidgetKind.MUSIC, withWeather = kind == WidgetKind.WEATHER),
         )
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)

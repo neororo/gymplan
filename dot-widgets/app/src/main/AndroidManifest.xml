@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Weather: Open-Meteo forecasts, and an optional one-off coarse location from the app. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- So the music widget can open Spotify when nothing is playing. -->
     <queries>
@@ -129,6 +132,27 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_music_info" />
         </receiver>
+
+        <receiver
+            android:name=".WeatherWidget"
+            android:exported="true"
+            android:label="@string/weather_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_weather_info" />
+        </receiver>
+
+        <receiver
+            android:name=".WeatherRefreshReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".WeatherJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <receiver
             android:name=".MediaActionReceiver"

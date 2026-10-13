@@ -31,7 +31,13 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /** Live values the renderer needs besides the clock. */
-data class DeviceState(val batteryLevel: Int, val charging: Boolean, val media: MediaInfo? = null)
+data class DeviceState(
+    val batteryLevel: Int,
+    val charging: Boolean,
+    val media: MediaInfo? = null,
+    val weather: WeatherData? = null,
+    val weatherPlaceSet: Boolean = true,
+)
 
 /**
  * Draws a widget's content on a transparent bitmap. The rounded background is drawn separately
@@ -96,6 +102,7 @@ class Renderer(
             WidgetKind.COUNTDOWN -> countdown(canvas, area, now.toLocalDate())
             WidgetKind.NOTE -> note(canvas, area)
             WidgetKind.MUSIC -> musicPreview(canvas, area, device.media ?: demoMedia())
+            WidgetKind.WEATHER -> weather(canvas, area, device, now)
         }
         return bitmap
     }
@@ -753,6 +760,172 @@ class Renderer(
         p.color = 0xFF0B1020.toInt()
         c.drawRect(0f, size * 0.68f, size.toFloat(), size.toFloat(), p)
         return MediaInfo("Canción", "Artista", art, playing = true, positionMs = 72_000, durationMs = 200_000, sessionActivity = null)
+    }
+
+    // ---- Weather -----------------------------------------------------------------------------
+
+    /** 9x9 dot icons: '#' foreground dot, '@' accent dot (sun, lightning). */
+    private object WeatherIcons {
+        val SUN = listOf(
+            "....@....", ".@.....@.", "...@@@...", "..@@@@@..", "@.@@@@@.@", "..@@@@@..", "...@@@...", ".@.....@.", "....@....",
+        )
+        val MOON = listOf(
+            "..####...", ".###.....", "###......", "###......", "###......", "###......", "###......", ".###.....", "..####...",
+        )
+        val PARTLY_DAY = listOf(
+            "@..@.....", ".@@@.....", "@@@@@....", ".@@@.###.", "@..#####.", "..#######", ".########", ".#######.", ".........",
+        )
+        val PARTLY_NIGHT = listOf(
+            ".##......", "##.......", "##.......", "##...###.", ".##.#####", "...######", "..#######", "..######.", ".........",
+        )
+        val CLOUD = listOf(
+            ".........", ".........", "...###...", "..#####..", ".#######.", "#########", "#########", ".#######.", ".........",
+        )
+        val FOG = listOf(
+            ".........", "#######..", ".........", "..#######", ".........", "#######..", ".........", "..#######", ".........",
+        )
+        val RAIN = listOf(
+            "...###...", "..#####..", ".#######.", "#########", ".#######.", ".........", ".#..#..#.", "#..#..#..", ".........",
+        )
+        val DRIZZLE = listOf(
+            "...###...", "..#####..", ".#######.", "#########", ".#######.", ".........", "..#...#..", ".........", "....#....",
+        )
+        val SNOW = listOf(
+            "...###...", "..#####..", ".#######.", "#########", ".#######.", ".........", "#.#.#.#.#", ".#.#.#.#.", ".........",
+        )
+        val STORM = listOf(
+            "...###...", "..#####..", ".#######.", "#########", ".##@####.", "...@@....", "..@@.....", "...@@....", "....@....",
+        )
+
+        fun of(code: Int, isDay: Boolean): List<String> = when (Condition.of(code)) {
+            Condition.CLEAR -> if (isDay) SUN else MOON
+            Condition.PARTLY -> if (isDay) PARTLY_DAY else PARTLY_NIGHT
+            Condition.CLOUDY -> CLOUD
+            Condition.FOG -> FOG
+            Condition.DRIZZLE -> DRIZZLE
+            Condition.RAIN -> RAIN
+            Condition.SNOW -> SNOW
+            Condition.STORM -> STORM
+        }
+    }
+
+    private fun drawWeatherIcon(canvas: Canvas, box: RectF, code: Int, isDay: Boolean) {
+        val rows = WeatherIcons.of(code, isDay)
+        val cell = min(box.width(), box.height()) / 9f
+        val left = box.centerX() - cell * 4.5f
+        val top = box.centerY() - cell * 4.5f
+        rows.forEachIndexed { r, row ->
+            row.forEachIndexed { c, ch ->
+                if (ch == '.') return@forEachIndexed
+                paint.color = if (ch == '@') accent else fg
+                canvas.drawCircle(left + cell * (c + 0.5f), top + cell * (r + 0.5f), cell * 0.38f, paint)
+            }
+        }
+    }
+
+    private fun degrees(celsius: Double): String {
+        val value = if (config.fahrenheit) celsius * 9 / 5 + 32 else celsius
+        return "${value.roundToInt()}°"
+    }
+
+    private fun weather(canvas: Canvas, area: RectF, device: DeviceState, now: LocalDateTime) {
+        val data = device.weather
+        if (!device.weatherPlaceSet || data == null) {
+            val title = if (!device.weatherPlaceSet) "ELIGE UBICACIÓN" else "CARGANDO…"
+            val hint = if (!device.weatherPlaceSet) "Abre Dot Widgets" else "Toca para actualizar"
+            val icon = RectF(area.left, area.top, area.left + area.height() * 0.5f, area.top + area.height() * 0.5f)
+            paint.alpha = 255
+            drawWeatherIcon(canvas, icon, 3, true)
+            fitText(canvas, title, RectF(area.left, area.top + area.height() * 0.6f, area.right, area.top + area.height() * 0.78f), bold, fg, Paint.Align.LEFT, "ELIGE UBICACIÓN")
+            fitText(canvas, hint, RectF(area.left, area.top + area.height() * 0.84f, area.right, area.bottom), light, secondary, Paint.Align.LEFT, "Toca para actualizar")
+            return
+        }
+        when (config.style) {
+            1 -> weatherHourly(canvas, area, data, now)
+            2 -> weatherWeek(canvas, area, data)
+            else -> weatherNow(canvas, area, data)
+        }
+    }
+
+    private fun todayRange(data: WeatherData): String =
+        data.days.firstOrNull()?.let { "${degrees(it.max)} / ${degrees(it.min)}" } ?: ""
+
+    /** "act. 10:30": shown when the forecast is old enough that the user should know. */
+    private fun staleLabel(data: WeatherData): String? {
+        val age = System.currentTimeMillis() - data.fetchedAt
+        if (age < 90 * 60 * 1000L) return null
+        val time = java.time.Instant.ofEpochMilli(data.fetchedAt).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+        return "act. %02d:%02d".format(time.hour, time.minute)
+    }
+
+    private fun weatherNow(canvas: Canvas, area: RectF, data: WeatherData) {
+        val h = area.height()
+        fitText(canvas, data.place.uppercase(locale), RectF(area.left, area.top, area.right, area.top + h * 0.14f), bold, secondary, Paint.Align.LEFT, "MMMMMMMMMMMM")
+        val iconSide = h * 0.42f
+        val iconBox = RectF(area.left, area.top + h * 0.2f, area.left + iconSide, area.top + h * 0.2f + iconSide)
+        drawWeatherIcon(canvas, iconBox, data.now.code, data.now.isDay)
+        fitText(canvas, degrees(data.now.temp), RectF(iconBox.right + h * 0.06f, iconBox.top, area.right, iconBox.bottom), bold, fg, Paint.Align.LEFT, "-00°")
+        val bottom = RectF(area.left, area.top + h * 0.72f, area.right, area.top + h * 0.86f)
+        fitText(canvas, Condition.of(data.now.code).label.uppercase(locale), RectF(bottom.left, bottom.top, bottom.centerX(), bottom.bottom), bold, accent, Paint.Align.LEFT, "MMMMMMMM")
+        fitText(canvas, todayRange(data), RectF(bottom.centerX(), bottom.top, bottom.right, bottom.bottom), bold, fg, Paint.Align.RIGHT, "-00° / -00°")
+        staleLabel(data)?.let {
+            fitText(canvas, it, RectF(area.left, area.top + h * 0.9f, area.right, area.bottom), light, dim, Paint.Align.LEFT, "act. 00:00")
+        }
+    }
+
+    /** Big current conditions across the top, used by the hourly and weekly styles. */
+    private fun weatherHeader(canvas: Canvas, box: RectF, data: WeatherData) {
+        val iconBox = RectF(box.left, box.top, box.left + box.height(), box.bottom)
+        drawWeatherIcon(canvas, iconBox, data.now.code, data.now.isDay)
+        val tempRight = iconBox.right + box.height() * 1.7f
+        fitText(canvas, degrees(data.now.temp), RectF(iconBox.right + box.height() * 0.15f, box.top, tempRight, box.bottom), bold, fg, Paint.Align.LEFT, "-00°")
+        val textLeft = tempRight + box.height() * 0.15f
+        fitText(canvas, data.place.uppercase(locale), RectF(textLeft, box.top, box.right, box.top + box.height() * 0.3f), bold, secondary, Paint.Align.RIGHT, "MMMMMMMMMMMM")
+        fitText(canvas, Condition.of(data.now.code).label.uppercase(locale), RectF(textLeft, box.top + box.height() * 0.37f, box.right, box.top + box.height() * 0.63f), bold, accent, Paint.Align.RIGHT, "MMMMMMMM")
+        val range = staleLabel(data) ?: todayRange(data)
+        fitText(canvas, range, RectF(textLeft, box.top + box.height() * 0.7f, box.right, box.bottom), light, fg, Paint.Align.RIGHT, "-00° / -00°")
+    }
+
+    private fun weatherHourly(canvas: Canvas, area: RectF, data: WeatherData, now: LocalDateTime) {
+        val h = area.height()
+        weatherHeader(canvas, RectF(area.left, area.top, area.right, area.top + h * 0.36f), data)
+        val upcoming = data.hours.filter { !it.time.isBefore(now.withMinute(0).withSecond(0).withNano(0)) }.take(6)
+        weatherColumns(canvas, RectF(area.left, area.top + h * 0.46f, area.right, area.bottom), upcoming.size) { i, col ->
+            val hour = upcoming[i]
+            val label = if (i == 0) "AHORA" else "%02d".format(hour.time.hour)
+            val extra = if (hour.precipitation >= 20) "${hour.precipitation}%" else ""
+            weatherColumn(canvas, col, label, hour.code, hour.isDay, degrees(hour.temp), extra, accent)
+        }
+    }
+
+    private fun weatherWeek(canvas: Canvas, area: RectF, data: WeatherData) {
+        val h = area.height()
+        weatherHeader(canvas, RectF(area.left, area.top, area.right, area.top + h * 0.36f), data)
+        val days = data.days.take(5)
+        weatherColumns(canvas, RectF(area.left, area.top + h * 0.46f, area.right, area.bottom), days.size) { i, col ->
+            val day = days[i]
+            val label = if (i == 0) "HOY" else day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).trimEnd('.').uppercase(locale)
+            weatherColumn(canvas, col, label, day.code, true, degrees(day.max), degrees(day.min), secondary)
+        }
+    }
+
+    private fun weatherColumns(canvas: Canvas, box: RectF, count: Int, draw: (Int, RectF) -> Unit) {
+        if (count == 0) return
+        val w = box.width() / count
+        for (i in 0 until count) draw(i, RectF(box.left + w * i, box.top, box.left + w * (i + 1), box.bottom))
+    }
+
+    /** Label, icon, main value and a small extra line, stacked and centred in [col]. */
+    private fun weatherColumn(canvas: Canvas, col: RectF, label: String, code: Int, isDay: Boolean, value: String, extra: String, extraColor: Int) {
+        val h = col.height()
+        val pad = col.width() * 0.08f
+        fitText(canvas, label, RectF(col.left + pad, col.top, col.right - pad, col.top + h * 0.16f), light, secondary, measureAs = "AHORA")
+        val iconSide = min(h * 0.34f, col.width() * 0.7f)
+        drawWeatherIcon(canvas, RectF(col.centerX() - iconSide / 2f, col.top + h * 0.22f, col.centerX() + iconSide / 2f, col.top + h * 0.22f + iconSide), code, isDay)
+        fitText(canvas, value, RectF(col.left + pad, col.top + h * 0.62f, col.right - pad, col.top + h * 0.8f), bold, fg, measureAs = "-00°")
+        if (extra.isNotEmpty()) {
+            fitText(canvas, extra, RectF(col.left + pad, col.top + h * 0.85f, col.right - pad, col.bottom), light, extraColor, measureAs = "-00°")
+        }
     }
 
     // ---- Helpers -----------------------------------------------------------------------------

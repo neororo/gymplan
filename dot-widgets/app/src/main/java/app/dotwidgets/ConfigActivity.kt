@@ -208,12 +208,24 @@ class ConfigActivity : Activity() {
                     ) { set(config.copy(artMode = it)) },
                 )
             }
+            WidgetKind.WEATHER -> {
+                form.addView(Ui.section(this, R.string.section_weather))
+                form.addView(WeatherUi.section(this) { updatePreview() })
+                form.addView(
+                    Ui.choices(this, listOf("°C", "°F"), if (config.fahrenheit) 1 else 0) { set(config.copy(fahrenheit = it == 1)) },
+                )
+            }
             WidgetKind.NOTE -> {
                 form.addView(Ui.section(this, R.string.section_text))
                 form.addView(textField(config.text, multiLine = true) { set(config.copy(text = it)) })
             }
             else -> Unit
         }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        WeatherUi.onPermissionResult(this, requestCode, grantResults)
     }
 
     private fun textField(value: String, multiLine: Boolean, onChange: (String) -> Unit): EditText =

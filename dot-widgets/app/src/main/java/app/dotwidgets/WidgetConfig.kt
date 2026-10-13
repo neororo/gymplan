@@ -19,6 +19,7 @@ data class WidgetConfig(
     val text: String = "",
     val targetEpochDay: Long = NO_DATE,
     val artMode: Int = ART_DOTS,
+    val fahrenheit: Boolean = false,
 ) {
     fun toJson(): String = JSONObject()
         .put("style", style)
@@ -34,6 +35,7 @@ data class WidgetConfig(
         .put("text", text)
         .put("targetEpochDay", targetEpochDay)
         .put("artMode", artMode)
+        .put("fahrenheit", fahrenheit)
         .toString()
 
     fun target(): LocalDate =
@@ -85,6 +87,7 @@ data class WidgetConfig(
                 text = o.optString("text", fallback.text),
                 targetEpochDay = o.optLong("targetEpochDay", fallback.targetEpochDay),
                 artMode = o.optInt("artMode", fallback.artMode),
+                fahrenheit = o.optBoolean("fahrenheit", fallback.fahrenheit),
             )
         }
     }

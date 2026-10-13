@@ -24,6 +24,9 @@
     <string name="music_play_pause">Reproducir o pausar</string>
     <string name="music_next">Siguiente</string>
 
+    <string name="weather_name">Tiempo</string>
+    <string name="weather_desc">Temperatura, previsión por horas o de la semana</string>
+
     <string name="style_digital">Digital</string>
     <string name="style_stacked">Apilado</string>
     <string name="style_analog">Analógico</string>
@@ -41,6 +44,10 @@
     <string name="style_compact">Compacto</string>
     <string name="style_large">Grande</string>
     <string name="style_cover">Carátula</string>
+
+    <string name="style_now">Ahora</string>
+    <string name="style_hourly">Por horas</string>
+    <string name="style_week">Semana</string>
 
     <string name="section_style">Estilo</string>
     <string name="section_colors">Colores</string>
@@ -100,6 +107,21 @@
     <string name="wallpaper_restore_confirm">Vuelve al fondo que trae el teléfono de fábrica en inicio y bloqueo.</string>
     <string name="wallpaper_restored">Fondo predeterminado restaurado</string>
     <string name="wallpaper_failed">No se pudo cambiar el fondo</string>
+
+    <string name="section_weather">Tiempo</string>
+    <string name="weather_no_place">Ubicación: sin elegir</string>
+    <string name="weather_place">Ubicación: %1$s</string>
+    <string name="weather_search">Buscar ciudad</string>
+    <string name="weather_search_hint">Ciudad</string>
+    <string name="weather_pick">Elige la ciudad</string>
+    <string name="weather_my_location">Usar mi ubicación</string>
+    <string name="weather_locating">Buscando tu ubicación…</string>
+    <string name="weather_location_denied">Sin permiso de ubicación. Puedes buscar tu ciudad.</string>
+    <string name="weather_location_failed">No se pudo obtener la ubicación. Busca tu ciudad.</string>
+    <string name="weather_place_set">Ubicación guardada</string>
+    <string name="weather_not_found">No se encontró esa ciudad</string>
+    <string name="weather_offline">Sin conexión. Inténtalo de nuevo.</string>
+    <string name="weather_attribution">Datos del tiempo: Open-Meteo.com (CC BY 4.0)</string>
 
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>

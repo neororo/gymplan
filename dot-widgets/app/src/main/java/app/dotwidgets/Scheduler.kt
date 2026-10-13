@@ -36,6 +36,12 @@ object Scheduler {
         } else {
             alarms.cancel(pending(context, ACTION_MINUTE, MINUTE_REQUEST))
         }
+        if (ids(context, manager, WidgetKind.WEATHER).isNotEmpty()) {
+            WeatherJob.schedule(context)
+            WeatherJob.refreshIfStale(context)
+        } else {
+            WeatherJob.cancel(context)
+        }
         if (WidgetKind.entries.any { ids(context, manager, it).isNotEmpty() }) {
             schedulePeriodic(context)
         } else {
