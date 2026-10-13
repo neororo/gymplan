@@ -2,21 +2,74 @@
 <resources>
     <string name="app_name">Dot Widgets</string>
 
-    <string name="clock_name">Reloj de puntos</string>
-    <string name="clock_desc">Hora y fecha en tipografía de matriz de puntos</string>
+    <string name="clock_name">Reloj</string>
+    <string name="clock_desc">Digital, apilado o analógico de puntos</string>
     <string name="battery_name">Batería</string>
-    <string name="battery_desc">Anillo de puntos con el nivel de batería</string>
+    <string name="battery_desc">Nivel de batería en anillo o barra de puntos</string>
     <string name="calendar_name">Calendario</string>
-    <string name="calendar_desc">El mes actual con el día de hoy marcado</string>
-    <string name="year_name">Año en puntos</string>
-    <string name="year_desc">Un punto por cada día del año</string>
+    <string name="calendar_desc">El mes o la semana con hoy marcado</string>
+    <string name="date_name">Fecha</string>
+    <string name="date_desc">Día, mes y día de la semana en grande</string>
+    <string name="progress_name">Progreso</string>
+    <string name="progress_desc">Cuánto ha pasado del día, la semana, el mes o el año</string>
+    <string name="countdown_name">Cuenta atrás</string>
+    <string name="countdown_desc">Días que faltan para una fecha</string>
+    <string name="note_name">Nota</string>
+    <string name="note_desc">Tu propio texto en tipografía de puntos</string>
 
-    <string name="section_theme">TEMA</string>
-    <string name="theme_dark">Oscuro</string>
-    <string name="theme_light">Claro</string>
-    <string name="theme_dynamic">Material You</string>
-    <string name="section_widgets">WIDGETS</string>
+    <string name="style_digital">Digital</string>
+    <string name="style_stacked">Apilado</string>
+    <string name="style_analog">Analógico</string>
+    <string name="style_ring">Anillo</string>
+    <string name="style_bar">Barra</string>
+    <string name="style_month">Mes</string>
+    <string name="style_week">Semana</string>
+    <string name="style_big">Grande</string>
+    <string name="style_line">Línea</string>
+    <string name="style_grid">Cuadrícula</string>
+    <string name="style_days">Días</string>
+    <string name="style_centered">Centrado</string>
+    <string name="style_left">A la izquierda</string>
+
+    <string name="section_style">Estilo</string>
+    <string name="section_colors">Colores</string>
+    <string name="section_font">Tipografía</string>
+    <string name="section_shape">Fondo y tamaño</string>
+    <string name="section_clock">Reloj</string>
+    <string name="section_period">Periodo</string>
+    <string name="section_event">Evento</string>
+    <string name="section_text">Texto</string>
+    <string name="section_my_widgets">Tus widgets</string>
+    <string name="section_add">Añadir widget</string>
+
+    <string name="option_accent">Usar color de acento</string>
+    <string name="option_show_date">Mostrar fecha</string>
+    <string name="option_background">Opacidad del fondo</string>
+    <string name="option_size">Tamaño del contenido</string>
+    <string name="option_corners">Esquinas</string>
+    <string name="font_dots">Puntos</string>
+    <string name="font_sans">Sans</string>
+    <string name="font_mono">Mono</string>
+    <string name="corner_square">Rectas</string>
+    <string name="corner_soft">Suaves</string>
+    <string name="corner_round">Redondas</string>
+    <string name="corner_rounder">Muy redondas</string>
+    <string name="hours_auto">Auto</string>
+    <string name="hours_12">12 h</string>
+    <string name="hours_24">24 h</string>
+    <string name="period_day">Día</string>
+    <string name="period_week">Semana</string>
+    <string name="period_month">Mes</string>
+    <string name="period_year">Año</string>
+    <string name="event_date">Fecha: %1$s</string>
+    <string name="text_hint">Escribe aquí</string>
+
+    <string name="save">Guardar</string>
+    <string name="edit">Editar</string>
     <string name="add_widget">Añadir</string>
+    <string name="no_widgets">Aún no tienes widgets en la pantalla de inicio.</string>
+    <string name="hint">Añade un widget y personalízalo: estilo, colores, tipografía, fondo y tamaño. Toca Editar para cambiarlo después.</string>
     <string name="pin_unsupported">Tu launcher no permite añadir widgets desde la app. Mantén pulsada la pantalla de inicio → Widgets → Dot Widgets.</string>
-    <string name="hint">Mantén pulsada la pantalla de inicio y elige Widgets → Dot Widgets, o pulsa Añadir.</string>
+    <string name="exact_alarm_hint">Para que el reloj cambie justo en cada minuto, permite las alarmas exactas.</string>
+    <string name="exact_alarm_button">Permitir</string>
 </resources>

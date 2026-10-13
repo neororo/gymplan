@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Clock ticks at each minute boundary. Android 12: granted by default; 13+: USE_EXACT_ALARM. -->
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -18,6 +25,15 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ConfigActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".ClockWidget"
             android:exported="true"
@@ -29,7 +45,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_clock_info" />
         </receiver>
-
         <receiver
             android:name=".BatteryWidget"
             android:exported="true"
@@ -41,7 +56,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_battery_info" />
         </receiver>
-
         <receiver
             android:name=".CalendarWidget"
             android:exported="true"
@@ -53,23 +67,67 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_calendar_info" />
         </receiver>
-
         <receiver
-            android:name=".YearWidget"
+            android:name=".DateWidget"
             android:exported="true"
-            android:label="@string/year_name">
+            android:label="@string/date_name">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/widget_year_info" />
+                android:resource="@xml/widget_date_info" />
+        </receiver>
+        <receiver
+            android:name=".YearWidget"
+            android:exported="true"
+            android:label="@string/progress_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_progress_info" />
+        </receiver>
+        <receiver
+            android:name=".CountdownWidget"
+            android:exported="true"
+            android:label="@string/countdown_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_countdown_info" />
+        </receiver>
+        <receiver
+            android:name=".NoteWidget"
+            android:exported="true"
+            android:label="@string/note_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_note_info" />
         </receiver>
 
-        <!-- Periodic refresh for the bitmap-based widgets (battery, calendar, year). -->
         <receiver
             android:name=".TickReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".SystemEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

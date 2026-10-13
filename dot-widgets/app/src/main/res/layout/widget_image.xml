@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="fitXY"
-        android:src="@drawable/widget_bg"
+        android:src="@drawable/bg_r24"
         android:tint="@color/dot_black" />
 
     <ImageView

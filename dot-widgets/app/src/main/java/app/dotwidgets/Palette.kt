@@ -1,68 +1,64 @@
 package app.dotwidgets
 
 import android.content.Context
-import android.graphics.Color
 import android.os.Build
 
-enum class ThemeMode(val key: String) {
-    DARK("dark"),
-    LIGHT("light"),
-    DYNAMIC("dynamic");
-
-    companion object {
-        fun fromKey(key: String?): ThemeMode = entries.firstOrNull { it.key == key } ?: DARK
-    }
+/** Background, foreground and accent colours; inactive dots are the foreground at low alpha. */
+data class Palette(val id: String, val name: String, val bg: Int, val fg: Int, val accent: Int) {
+    val dim: Int get() = (fg and 0x00FFFFFF) or (0x40 shl 24)
 }
 
-/** Colours shared by every widget: background, foreground dots, inactive dots and the accent. */
-data class Palette(val bg: Int, val fg: Int, val dim: Int, val accent: Int) {
+object Palettes {
+    const val DEFAULT_ID = "nothing_dark"
 
-    companion object {
-        private const val PREFS = "dot_prefs"
-        private const val KEY_THEME = "theme"
-        private const val RED = 0xFFD71921.toInt()
+    private val presets = listOf(
+        Palette("nothing_dark", "Nothing", 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFFD71921.toInt()),
+        Palette("nothing_light", "Nothing claro", 0xFFF2F2F2.toInt(), 0xFF000000.toInt(), 0xFFD71921.toInt()),
+        Palette("graphite", "Grafito", 0xFF1C1C1E.toInt(), 0xFFEDEDED.toInt(), 0xFFFF453A.toInt()),
+        Palette("paper", "Papel", 0xFFFAF7F0.toInt(), 0xFF2B2B2B.toInt(), 0xFFE4572E.toInt()),
+        Palette("red", "Rojo", 0xFFD71921.toInt(), 0xFFFFFFFF.toInt(), 0xFF000000.toInt()),
+        Palette("amber", "Ámbar retro", 0xFF000000.toInt(), 0xFFFFB000.toInt(), 0xFFFFFFFF.toInt()),
+        Palette("terminal", "Terminal", 0xFF000000.toInt(), 0xFF33FF66.toInt(), 0xFFFFFFFF.toInt()),
+        Palette("midnight", "Medianoche", 0xFF0B1426.toInt(), 0xFFE6ECFF.toInt(), 0xFF4D8DFF.toInt()),
+        Palette("ocean", "Océano", 0xFF0E3B43.toInt(), 0xFFD8F3F0.toInt(), 0xFF3DDC97.toInt()),
+        Palette("forest", "Bosque", 0xFF1B2A1F.toInt(), 0xFFE3F2D9.toInt(), 0xFF9BD770.toInt()),
+        Palette("sunset", "Atardecer", 0xFF2B1A12.toInt(), 0xFFFFE7D1.toInt(), 0xFFFF7A3D.toInt()),
+        Palette("coffee", "Café", 0xFF3E2C23.toInt(), 0xFFF1E3D3.toInt(), 0xFFD9A066.toInt()),
+        Palette("slate", "Pizarra", 0xFF3A3A3C.toInt(), 0xFFF2F2F7.toInt(), 0xFFFFD60A.toInt()),
+        Palette("sand", "Arena", 0xFFE8DCC8.toInt(), 0xFF3B3226.toInt(), 0xFFC0582B.toInt()),
+        Palette("lavender", "Lavanda", 0xFFE9E4F5.toInt(), 0xFF2E2547.toInt(), 0xFF7B5CD6.toInt()),
+        Palette("rose", "Rosa", 0xFFF8E1E7.toInt(), 0xFF4A1F2B.toInt(), 0xFFE0457B.toInt()),
+        Palette("mint", "Menta", 0xFFDFF5EA.toInt(), 0xFF17382A.toInt(), 0xFF1FA971.toInt()),
+        Palette("ice", "Hielo", 0xFFE8F4FA.toInt(), 0xFF0F2A3A.toInt(), 0xFF00A3E0.toInt()),
+    )
 
-        fun themeMode(context: Context): ThemeMode =
-            ThemeMode.fromKey(prefs(context).getString(KEY_THEME, null))
+    /** Material You palettes first (Android 12+), then the fixed presets. */
+    fun all(context: Context): List<Palette> = dynamic(context) + presets
 
-        fun setThemeMode(context: Context, mode: ThemeMode) {
-            prefs(context).edit().putString(KEY_THEME, mode.key).apply()
-        }
+    fun find(context: Context, id: String): Palette =
+        all(context).firstOrNull { it.id == id } ?: presets.first()
 
-        fun current(context: Context): Palette = of(context, themeMode(context))
-
-        fun of(context: Context, mode: ThemeMode): Palette = when (mode) {
-            ThemeMode.DARK -> Palette(
-                bg = Color.BLACK,
-                fg = Color.WHITE,
-                dim = withAlpha(Color.WHITE, 0x40),
-                accent = RED,
-            )
-            ThemeMode.LIGHT -> Palette(
-                bg = 0xFFF2F2F2.toInt(),
-                fg = Color.BLACK,
-                dim = withAlpha(Color.BLACK, 0x30),
-                accent = RED,
-            )
-            ThemeMode.DYNAMIC -> dynamic(context) ?: of(context, ThemeMode.DARK)
-        }
-
-        fun dynamicSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
-        private fun dynamic(context: Context): Palette? {
-            if (!dynamicSupported()) return null
-            val fg = context.getColor(android.R.color.system_accent1_100)
-            return Palette(
-                bg = context.getColor(android.R.color.system_neutral1_900),
-                fg = fg,
-                dim = withAlpha(fg, 0x40),
-                accent = context.getColor(android.R.color.system_accent3_300),
-            )
-        }
-
-        private fun withAlpha(color: Int, alpha: Int): Int = (color and 0x00FFFFFF) or (alpha shl 24)
-
-        private fun prefs(context: Context) =
-            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun dynamic(context: Context): List<Palette> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return emptyList()
+        return listOf(
+            Palette(
+                "you_dark", "Material You",
+                context.getColor(android.R.color.system_neutral1_900),
+                context.getColor(android.R.color.system_accent1_100),
+                context.getColor(android.R.color.system_accent3_300),
+            ),
+            Palette(
+                "you_light", "Material You claro",
+                context.getColor(android.R.color.system_accent1_50),
+                context.getColor(android.R.color.system_neutral1_900),
+                context.getColor(android.R.color.system_accent1_600),
+            ),
+            Palette(
+                "you_vivid", "Material You intenso",
+                context.getColor(android.R.color.system_accent1_600),
+                context.getColor(android.R.color.system_accent1_50),
+                context.getColor(android.R.color.system_accent3_200),
+            ),
+        )
     }
 }

@@ -1,134 +1,119 @@
 package app.dotwidgets
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.os.BatteryManager
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.text.format.DateFormat
-import android.view.LayoutInflater
+import android.provider.Settings
+import android.view.Gravity
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.RadioGroup
-import android.widget.TextView
+import android.widget.ScrollView
 import android.widget.Toast
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import app.dotwidgets.Ui.dp
 
+/** Catalogue of widgets to add, the widgets already on the home screen, and the clock permission hint. */
 class MainActivity : Activity() {
 
-    private class Entry(
-        val provider: Class<out DotWidget>,
-        val name: Int,
-        val description: Int,
-        val widthDp: Int,
-        val heightDp: Int,
-        val render: (DotRenderer, Int, Int) -> Bitmap,
-    )
-
-    private lateinit var list: LinearLayout
+    private lateinit var content: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        list = findViewById(R.id.widget_list)
-        setUpThemePicker()
+        content = Ui.column(this)
+        setContentView(ScrollView(this).apply {
+            setBackgroundColor(Ui.BLACK)
+            fitsSystemWindows = true
+            addView(content)
+        })
     }
 
-    // Re-rendered on every resume so the previews show the current time and battery level.
+    // Rebuilt on every resume: previews show the current time and any widget added meanwhile.
     override fun onResume() {
         super.onResume()
-        renderList()
+        render()
     }
 
-    private fun setUpThemePicker() {
-        val group = findViewById<RadioGroup>(R.id.theme_group)
-        findViewById<TextView>(R.id.theme_dynamic).isEnabled = Palette.dynamicSupported()
-        group.check(
-            when (Palette.themeMode(this)) {
-                ThemeMode.DARK -> R.id.theme_dark
-                ThemeMode.LIGHT -> R.id.theme_light
-                ThemeMode.DYNAMIC -> R.id.theme_dynamic
-            },
-        )
-        group.setOnCheckedChangeListener { _, checkedId ->
-            val mode = when (checkedId) {
-                R.id.theme_light -> ThemeMode.LIGHT
-                R.id.theme_dynamic -> ThemeMode.DYNAMIC
-                else -> ThemeMode.DARK
-            }
-            Palette.setThemeMode(this, mode)
-            WidgetUpdater.updateAll(this)
-            renderList()
+    private fun render() {
+        content.removeAllViews()
+        content.addView(Ui.title(this, getString(R.string.app_name)))
+        content.addView(Ui.body(this, getString(R.string.hint)))
+
+        if (!Scheduler.canTickExactly(this) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            content.addView(Ui.body(this, getString(R.string.exact_alarm_hint), Ui.WHITE).apply { setPadding(0, dp(16), 0, 0) })
+            content.addView(button(getString(R.string.exact_alarm_button)) {
+                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
+            })
         }
-    }
 
-    private fun entries(): List<Entry> {
-        val today = LocalDate.now()
-        val locale = Locale.getDefault()
-        val timePattern = if (DateFormat.is24HourFormat(this)) "HH:mm" else "hh:mm"
-        val time = LocalTime.now().format(DateTimeFormatter.ofPattern(timePattern, locale))
-        val date = today.format(DateTimeFormatter.ofPattern("EEE d MMM", locale)).uppercase(locale)
-        val battery = getSystemService(BatteryManager::class.java)
-        return listOf(
-            Entry(ClockWidget::class.java, R.string.clock_name, R.string.clock_desc, 300, 140) { r, w, h ->
-                r.clockPreview(w, h, time, date)
-            },
-            Entry(BatteryWidget::class.java, R.string.battery_name, R.string.battery_desc, 150, 150) { r, w, h ->
-                r.battery(w, h, battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY), battery.isCharging)
-            },
-            Entry(CalendarWidget::class.java, R.string.calendar_name, R.string.calendar_desc, 240, 240) { r, w, h ->
-                r.calendar(w, h, today)
-            },
-            Entry(YearWidget::class.java, R.string.year_name, R.string.year_desc, 300, 140) { r, w, h ->
-                r.year(w, h, today)
-            },
-        )
-    }
-
-    private fun renderList() {
-        val palette = Palette.current(this)
-        val renderer = DotRenderer(this, palette)
-        val inflater = LayoutInflater.from(this)
-        list.removeAllViews()
-        for (entry in entries()) {
-            val item = inflater.inflate(R.layout.item_widget, list, false)
-            item.findViewById<ImageView>(R.id.preview).setImageBitmap(preview(entry, renderer, palette))
-            item.findViewById<TextView>(R.id.name).setText(entry.name)
-            item.findViewById<TextView>(R.id.description).setText(entry.description)
-            item.findViewById<Button>(R.id.add).setOnClickListener { pin(entry.provider) }
-            list.addView(item)
-        }
-    }
-
-    /** Widget preview: content bitmap on the same rounded background the home-screen widget uses. */
-    private fun preview(entry: Entry, renderer: DotRenderer, palette: Palette): Bitmap {
-        val density = resources.displayMetrics.density
-        val width = (entry.widthDp * density).toInt()
-        val height = (entry.heightDp * density).toInt()
-        val padding = 12 * density
-        val radius = 24 * density
-        val content = entry.render(renderer, (width - 2 * padding).toInt(), (height - 2 * padding).toInt())
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.bg }
-        canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), radius, radius, paint)
-        canvas.drawBitmap(content, padding, padding, null)
-        return bitmap
-    }
-
-    private fun pin(provider: Class<out DotWidget>) {
         val manager = AppWidgetManager.getInstance(this)
-        if (manager.isRequestPinAppWidgetSupported) {
-            manager.requestPinAppWidget(ComponentName(this, provider), null, null)
-        } else {
-            Toast.makeText(this, R.string.pin_unsupported, Toast.LENGTH_LONG).show()
+        val placed = WidgetKind.entries.flatMap { kind -> Scheduler.ids(this, manager, kind).map { kind to it } }
+        content.addView(Ui.section(this, R.string.section_my_widgets))
+        if (placed.isEmpty()) {
+            content.addView(Ui.body(this, getString(R.string.no_widgets)))
         }
+        for ((kind, id) in placed) {
+            val config = WidgetStore.load(this, id, kind)
+            val (w, h) = WidgetViews.sizeDp(manager.getAppWidgetOptions(id), kind)
+            content.addView(row(kind, Previews.render(this, kind, config, w, h, dp(140)), getString(R.string.edit)) {
+                startActivity(ConfigActivity.intent(this, id))
+            })
+        }
+
+        content.addView(Ui.section(this, R.string.section_add))
+        for (kind in WidgetKind.entries) {
+            val preview = Previews.render(this, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, dp(140))
+            content.addView(row(kind, preview, getString(R.string.add_widget)) { pin(kind) })
+        }
+    }
+
+    private fun row(kind: WidgetKind, preview: android.graphics.Bitmap, action: String, onClick: () -> Unit): LinearLayout {
+        val texts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), 0, dp(8), 0)
+            addView(Ui.title(this@MainActivity, getString(kind.title), 18f))
+            addView(Ui.body(this@MainActivity, getString(kind.description)))
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, dp(8))
+            addView(ImageView(this@MainActivity).apply {
+                setImageBitmap(preview)
+                adjustViewBounds = true
+            }, LinearLayout.LayoutParams(dp(140), ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(texts, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(button(action, onClick))
+        }
+    }
+
+    private fun button(text: String, onClick: () -> Unit) = Button(this).apply {
+        this.text = text
+        setTextColor(Ui.WHITE)
+        backgroundTintList = android.content.res.ColorStateList.valueOf(Ui.RED)
+        setOnClickListener { onClick() }
+    }
+
+    private fun pin(kind: WidgetKind) {
+        val manager = AppWidgetManager.getInstance(this)
+        if (!manager.isRequestPinAppWidgetSupported) {
+            Toast.makeText(this, R.string.pin_unsupported, Toast.LENGTH_LONG).show()
+            return
+        }
+        // Open the editor once the widget lands; the launcher fills in EXTRA_APPWIDGET_ID, hence MUTABLE.
+        val mutable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or mutable
+        val onPinned = PendingIntent.getActivity(
+            this,
+            kind.ordinal,
+            Intent(this, ConfigActivity::class.java).setAction("app.dotwidgets.action.PINNED_${kind.name}"),
+            flags,
+        )
+        manager.requestPinAppWidget(ComponentName(this, kind.provider), null, onPinned)
     }
 }
