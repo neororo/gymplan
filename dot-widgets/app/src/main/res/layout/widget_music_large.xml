@@ -44,7 +44,7 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="40dp"
             android:gravity="center"
             android:orientation="horizontal">
 
@@ -54,8 +54,7 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:contentDescription="@string/music_previous"
-                android:padding="10dp"
-                android:scaleType="fitCenter" />
+                android:scaleType="center" />
 
             <ImageView
                 android:id="@+id/play"
@@ -63,8 +62,7 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:contentDescription="@string/music_play_pause"
-                android:padding="8dp"
-                android:scaleType="fitCenter" />
+                android:scaleType="center" />
 
             <ImageView
                 android:id="@+id/next"
@@ -72,8 +70,7 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:contentDescription="@string/music_next"
-                android:padding="10dp"
-                android:scaleType="fitCenter" />
+                android:scaleType="center" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

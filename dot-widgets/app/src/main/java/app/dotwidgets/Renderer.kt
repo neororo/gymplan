@@ -42,6 +42,8 @@ class Renderer(
     private val config: WidgetConfig,
     private val palette: Palette,
     private val locale: Locale = Locale.getDefault(),
+    /** Bitmap pixels per dp; lower than the screen density when a bitmap is drawn small and scaled up. */
+    private val pxPerDp: Float = context.resources.displayMetrics.density,
 ) {
     private val bold: Typeface
     private val light: Typeface
@@ -504,8 +506,9 @@ class Renderer(
         PREVIOUS(6, 7, column(0, 0..6) + column(2, 3..3) + column(3, 2..4) + column(4, 1..5) + column(5, 0..6)),
     }
 
-    fun glyph(glyph: Glyph, size: Int): Bitmap {
-        val side = size.coerceAtLeast(1)
+    /** A control icon at a fixed dot size ([cellPx] per dot), so it never stretches with its button. */
+    fun glyph(glyph: Glyph, cellPx: Float): Bitmap {
+        val side = ceil(cellPx * 7f).toInt().coerceAtLeast(1)
         val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
         drawGlyph(Canvas(bitmap), glyph, RectF(0f, 0f, side.toFloat(), side.toFloat()), fg)
         return bitmap
@@ -583,6 +586,10 @@ class Renderer(
         return bitmap
     }
 
+    /**
+     * Title, artist and (optionally) a progress row, vertically centred. Text size follows the
+     * widget's height but stays between 10 and 16 dp, so it reads like normal widget text.
+     */
     private fun drawMusicInfo(canvas: Canvas, box: RectF, info: MediaInfo?, access: Boolean, progress: Boolean) {
         val title: String
         val subtitle: String
@@ -600,43 +607,59 @@ class Renderer(
                 subtitle = info.artist
             }
         }
-        val h = box.height()
-        if (progress) {
-            singleLine(canvas, title, RectF(box.left, box.top + h * 0.06f, box.right, box.top + h * 0.34f), bold, fg)
-            singleLine(canvas, subtitle, RectF(box.left, box.top + h * 0.42f, box.right, box.top + h * 0.6f), light, dim)
-            val fraction = if (info != null && info.durationMs > 0) (info.positionMs.toFloat() / info.durationMs).coerceIn(0f, 1f) else 0f
-            val rowTop = box.top + h * 0.76f
-            val rowH = h * 0.2f
-            val cols = (box.width() / rowH).toInt().coerceIn(10, 40)
-            val filled = (fraction * cols).toInt()
-            for (i in 0 until cols) {
-                paint.color = when {
-                    info == null -> dim
-                    i < filled -> fg
-                    i == filled -> accent
-                    else -> dim
-                }
-                canvas.drawCircle(box.left + box.width() / cols * (i + 0.5f), rowTop + rowH / 2f, min(box.width() / cols, rowH) * 0.34f, paint)
+        val titleSize = (box.height() * if (progress) 0.2f else 0.28f)
+            .coerceIn(10f * pxPerDp, 16f * pxPerDp)
+            .coerceAtMost(box.height() * 0.4f)
+        val subtitleSize = titleSize * 0.8f
+        val titleH = titleSize * 1.25f
+        val subtitleH = subtitleSize * 1.3f
+        val dotR = titleSize * 0.13f
+        val rowGap = titleSize * 0.5f
+        val total = titleH + subtitleH + if (progress) rowGap + dotR * 2f else 0f
+        var y = box.centerY() - total / 2f
+        drawLine(canvas, title, box.left, y, box.width(), titleSize, titleH, bold, fg)
+        y += titleH
+        drawLine(canvas, subtitle, box.left, y, box.width(), subtitleSize, subtitleH, light, dim)
+        y += subtitleH
+        if (!progress) return
+        y += rowGap + dotR
+        val fraction = if (info != null && info.durationMs > 0) (info.positionMs.toFloat() / info.durationMs).coerceIn(0f, 1f) else 0f
+        val cols = (box.width() / (dotR * 3.2f)).toInt().coerceIn(8, 60)
+        val step = box.width() / cols
+        val filled = (fraction * cols).toInt()
+        for (i in 0 until cols) {
+            paint.color = when {
+                info == null -> dim
+                i < filled -> fg
+                i == filled -> accent
+                else -> dim
             }
-        } else {
-            singleLine(canvas, title, RectF(box.left, box.top + h * 0.14f, box.right, box.top + h * 0.5f), bold, fg)
-            singleLine(canvas, subtitle, RectF(box.left, box.top + h * 0.6f, box.right, box.top + h * 0.84f), light, dim)
+            canvas.drawCircle(box.left + step * (i + 0.5f), y, dotR, paint)
         }
     }
 
-    /** Text sized to the box height, cut with an ellipsis if it is too long. */
-    private fun singleLine(canvas: Canvas, text: String, box: RectF, typeface: Typeface, color: Int) {
-        if (box.width() <= 0f || box.height() <= 0f) return
+    /** One line of text at a fixed size, cut with an ellipsis when too long. */
+    private fun drawLine(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        top: Float,
+        width: Float,
+        size: Float,
+        lineHeight: Float,
+        typeface: Typeface,
+        color: Int,
+    ) {
+        if (width <= 0f) return
         val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             this.typeface = typeface
             this.color = color
-            textSize = 100f
+            textSize = size
         }
-        textPaint.getTextBounds("HÁg", 0, 3, bounds)
-        textPaint.textSize = 100f * box.height() / bounds.height().coerceAtLeast(1)
-        val shown = TextUtils.ellipsize(text, textPaint, box.width(), TextUtils.TruncateAt.END).toString()
+        val shown = TextUtils.ellipsize(text, textPaint, width, TextUtils.TruncateAt.END).toString()
         val metrics = textPaint.fontMetrics
-        canvas.drawText(shown, box.left, box.centerY() - (metrics.ascent + metrics.descent) / 2f, textPaint)
+        val baseline = top + (lineHeight - (metrics.descent - metrics.ascent)) / 2f - metrics.ascent
+        canvas.drawText(shown, x, baseline, textPaint)
     }
 
     /** All three music styles drawn into one image, for previews (the widget itself uses layouts). */
@@ -656,10 +679,11 @@ class Renderer(
                 val r = min(area.width(), area.height()) * 0.17f
                 paint.color = (palette.bg and 0x00FFFFFF) or (0xD2 shl 24)
                 canvas.drawCircle(area.centerX(), area.centerY(), r, paint)
-                drawGlyph(canvas, if (info.playing) Glyph.PAUSE else Glyph.PLAY, RectF(area.centerX() - r * 0.7f, area.centerY() - r * 0.7f, area.centerX() + r * 0.7f, area.centerY() + r * 0.7f), fg)
+                val half = min(r * 0.7f, 3.5f * 4f * pxPerDp)
+                drawGlyph(canvas, if (info.playing) Glyph.PAUSE else Glyph.PLAY, RectF(area.centerX() - half, area.centerY() - half, area.centerX() + half, area.centerY() + half), fg)
             }
             else -> {
-                val rowH = area.height() * 0.3f
+                val rowH = min(area.height() * 0.3f, 40f * pxPerDp)
                 val top = RectF(area.left, area.top, area.right, area.bottom - rowH)
                 val art = RectF(top.left, top.top, top.left + top.height(), top.bottom)
                 drawAlbumArt(canvas, art, info.art)
@@ -674,7 +698,8 @@ class Renderer(
         val glyphs = listOf(Glyph.PREVIOUS, if (playing) Glyph.PAUSE else Glyph.PLAY, Glyph.NEXT)
         glyphs.forEachIndexed { i, glyph ->
             val cx = box.left + w * (i + 0.5f)
-            val half = min(w, box.height()) * 0.38f
+            // Same cap as the widget: at most 3.4 dp per dot, 7 dots tall.
+            val half = min(min(w, box.height()) * 0.38f, 3.5f * 3.4f * pxPerDp)
             drawGlyph(canvas, glyph, RectF(cx - half, box.centerY() - half, cx + half, box.centerY() + half), fg)
         }
     }

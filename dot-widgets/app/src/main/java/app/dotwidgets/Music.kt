@@ -205,8 +205,8 @@ object MusicViews {
     // Art, text and icons together stay well under the ~1 MB RemoteViews transaction limit.
     private const val MAX_PIXELS = 170_000f
     private const val PADDING_DP = 12
-    private const val CONTROLS_DP = 108
-    private const val CONTROL_ROW_DP = 48
+    private const val CONTROLS_DP = 96
+    private const val CONTROL_ROW_DP = 40
     private const val GAP_DP = 10
 
     fun build(context: Context, options: android.os.Bundle?, id: Int, config: WidgetConfig, palette: Palette): RemoteViews {
@@ -215,7 +215,6 @@ object MusicViews {
         val innerH = (heightDp - 2 * PADDING_DP).coerceAtLeast(40)
         val access = MediaState.hasAccess(context)
         val info = if (access) MediaState.current(context) else null
-        val renderer = Renderer(context, config, palette)
 
         val layout: Int
         val artDp: Int
@@ -240,27 +239,33 @@ object MusicViews {
             }
         }
         val density = context.resources.displayMetrics.density
-        val iconDp = 28
-        val area = artDp * artDp + infoW.coerceAtLeast(0) * infoH + 3 * iconDp * iconDp
-        val px = density * min(1f, sqrt(MAX_PIXELS / (area * density * density)))
+        // The art is big dots and tolerates a low resolution; the small dotted text does not,
+        // so next to text the art gets at most 1.6 px/dp and the text takes the rest of the budget.
+        val artPx = if (config.style == STYLE_COVER) min(density, sqrt(MAX_PIXELS) / artDp) else min(density, 1.6f)
+        val artPixels = (artDp * artPx) * (artDp * artPx)
+        val infoArea = (infoW.coerceAtLeast(1) * infoH.coerceAtLeast(1)).toFloat()
+        val px = min(density, sqrt((MAX_PIXELS - artPixels).coerceAtLeast(20_000f) / infoArea))
+        val renderer = Renderer(context, config, palette, pxPerDp = px)
+        // Icon dots grow with the widget's height but stay between 2.2 and 3.4 dp (4 dp for the cover button).
+        // Icons are drawn at full density and shown unscaled (scaleType="center").
+        val iconCell = density * if (config.style == STYLE_COVER) (artDp / 24f).coerceIn(2.4f, 4f) else (innerH / 16f).coerceIn(2.2f, 3.4f)
 
         val views = RemoteViews(context.packageName, layout)
         views.setImageViewResource(R.id.bg, WidgetViews.cornerDrawable(config.corner))
         views.setInt(R.id.bg, "setColorFilter", palette.bg)
         views.setInt(R.id.bg, "setImageAlpha", config.bgAlpha * 255 / 100)
-        views.setImageViewBitmap(R.id.art, renderer.albumArt(info?.art, (artDp * px).toInt()))
+        views.setImageViewBitmap(R.id.art, renderer.albumArt(info?.art, (artDp * artPx).toInt()))
 
-        val icon = (iconDp * px * 1.5f).toInt()
         val playGlyph = if (info?.playing == true) Renderer.Glyph.PAUSE else Renderer.Glyph.PLAY
-        views.setImageViewBitmap(R.id.play, renderer.glyph(playGlyph, icon))
+        views.setImageViewBitmap(R.id.play, renderer.glyph(playGlyph, iconCell))
         views.setOnClickPendingIntent(R.id.play, MediaActionReceiver.pending(context, MediaActionReceiver.ACTION_PLAY_PAUSE, 21))
         if (config.style == STYLE_COVER) {
             views.setInt(R.id.play_bg, "setColorFilter", palette.bg)
             views.setInt(R.id.play_bg, "setImageAlpha", 210)
         } else {
             views.setImageViewBitmap(R.id.info, renderer.musicInfo((infoW * px).toInt(), (infoH * px).toInt(), info, access, config.style == STYLE_LARGE))
-            views.setImageViewBitmap(R.id.prev, renderer.glyph(Renderer.Glyph.PREVIOUS, icon))
-            views.setImageViewBitmap(R.id.next, renderer.glyph(Renderer.Glyph.NEXT, icon))
+            views.setImageViewBitmap(R.id.prev, renderer.glyph(Renderer.Glyph.PREVIOUS, iconCell))
+            views.setImageViewBitmap(R.id.next, renderer.glyph(Renderer.Glyph.NEXT, iconCell))
             views.setOnClickPendingIntent(R.id.prev, MediaActionReceiver.pending(context, MediaActionReceiver.ACTION_PREVIOUS, 20))
             views.setOnClickPendingIntent(R.id.next, MediaActionReceiver.pending(context, MediaActionReceiver.ACTION_NEXT, 22))
         }

@@ -134,7 +134,7 @@ object Previews {
         val padding = 12 * density * fit
         val radius = WidgetConfig.CORNER_RADII[config.corner.coerceIn(0, 3)] * density * fit
         val palette = Palettes.find(context, config.palette)
-        val content = Renderer(context, config, palette).render(
+        val content = Renderer(context, config, palette, pxPerDp = density * fit).render(
             kind,
             (width - 2 * padding).toInt(),
             (height - 2 * padding).toInt(),
