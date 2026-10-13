@@ -13,8 +13,8 @@ android {
         applicationId = "app.dotwidgets"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.4.0"
+        versionCode = 6
+        versionName = "0.4.1"
     }
 
     // Fixed debug key so each CI-built APK installs over the previous one. Not a secret:

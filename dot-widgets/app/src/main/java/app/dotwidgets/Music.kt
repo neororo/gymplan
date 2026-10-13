@@ -20,6 +20,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.view.KeyEvent
+import android.view.View
 import android.widget.RemoteViews
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -243,7 +244,8 @@ object MusicViews {
         // so next to text the art gets at most 1.6 px/dp and the text takes the rest of the budget.
         val artPx = if (config.style == STYLE_COVER) min(density, sqrt(MAX_PIXELS) / artDp) else min(density, 1.6f)
         val artPixels = (artDp * artPx) * (artDp * artPx)
-        val infoArea = (infoW.coerceAtLeast(1) * infoH.coerceAtLeast(1)).toFloat()
+        // Text area plus room for a few ticker pages of the title.
+        val infoArea = (infoW.coerceAtLeast(1) * infoH.coerceAtLeast(1)).toFloat() * 1.6f
         val px = min(density, sqrt((MAX_PIXELS - artPixels).coerceAtLeast(20_000f) / infoArea))
         val renderer = Renderer(context, config, palette, pxPerDp = px)
         // Icon dots grow with the widget's height but stay between 2.2 and 3.4 dp (4 dp for the cover button).
@@ -263,7 +265,26 @@ object MusicViews {
             views.setInt(R.id.play_bg, "setColorFilter", palette.bg)
             views.setInt(R.id.play_bg, "setImageAlpha", 210)
         } else {
-            views.setImageViewBitmap(R.id.info, renderer.musicInfo((infoW * px).toInt(), (infoH * px).toInt(), info, access, config.style == STYLE_LARGE))
+            val progress = config.style == STYLE_LARGE
+            val textW = (infoW * px).toInt()
+            val areaH = (infoH * px).toInt()
+            val pages = renderer.musicTitlePages(textW, areaH, info, access, progress)
+            if (pages.size == 1) {
+                views.setViewVisibility(R.id.title_static, View.VISIBLE)
+                views.setViewVisibility(R.id.title_flipper, View.GONE)
+                views.setImageViewBitmap(R.id.title_static, pages[0])
+            } else {
+                // Long title: pages slide in one after another (ViewFlipper, autoStart in the layout).
+                views.setViewVisibility(R.id.title_static, View.GONE)
+                views.setViewVisibility(R.id.title_flipper, View.VISIBLE)
+                views.removeAllViews(R.id.title_flipper)
+                for (page in pages) {
+                    views.addView(R.id.title_flipper, RemoteViews(context.packageName, R.layout.music_title_page).apply {
+                        setImageViewBitmap(R.id.page, page)
+                    })
+                }
+            }
+            views.setImageViewBitmap(R.id.info, renderer.musicDetails(textW, areaH, info, access, progress))
             views.setImageViewBitmap(R.id.prev, renderer.glyph(Renderer.Glyph.PREVIOUS, iconCell))
             views.setImageViewBitmap(R.id.next, renderer.glyph(Renderer.Glyph.NEXT, iconCell))
             views.setOnClickPendingIntent(R.id.prev, MediaActionReceiver.pending(context, MediaActionReceiver.ACTION_PREVIOUS, 20))

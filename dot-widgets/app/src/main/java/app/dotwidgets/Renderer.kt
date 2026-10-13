@@ -580,52 +580,61 @@ class Renderer(
         }
     }
 
-    fun musicInfo(width: Int, height: Int, info: MediaInfo?, access: Boolean, progress: Boolean): Bitmap {
-        val bitmap = Bitmap.createBitmap(width.coerceAtLeast(1), height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
-        drawMusicInfo(Canvas(bitmap), RectF(0f, 0f, width.toFloat(), height.toFloat()), info, access, progress)
+    /** Font sizes for the music text, derived from the height next to the album art. */
+    private class MusicMetrics(areaHeight: Float, progress: Boolean, pxPerDp: Float) {
+        val title = (areaHeight * if (progress) 0.2f else 0.28f)
+            .coerceIn(10f * pxPerDp, 16f * pxPerDp)
+            .coerceAtMost(areaHeight * 0.4f)
+        val subtitle = title * 0.8f
+        val titleLine = title * 1.25f
+        val subtitleLine = subtitle * 1.3f
+        val dotR = title * 0.13f
+        val rowGap = title * 0.5f
+        val details = subtitleLine + if (progress) rowGap + dotR * 2f + dotR else 0f
+    }
+
+    private fun musicTexts(info: MediaInfo?, access: Boolean): Pair<String, String> = when {
+        !access -> "ACTIVA EL ACCESO" to "Toca para configurar"
+        info == null -> "NADA SONANDO" to "Toca play para reanudar"
+        else -> info.title.uppercase(locale) to info.artist
+    }
+
+    /** Artist line in the foreground colour at reduced alpha: readable, but quieter than the title. */
+    private val secondary: Int get() = (fg and 0x00FFFFFF) or (0xB0 shl 24)
+
+    /**
+     * The title split into pages that each fit one line, word by word. The widget flips through
+     * them like a ticker, so long titles are shown whole instead of cut off.
+     */
+    fun musicTitlePages(width: Int, areaHeight: Int, info: MediaInfo?, access: Boolean, progress: Boolean): List<Bitmap> {
+        val metrics = MusicMetrics(areaHeight.toFloat(), progress, pxPerDp)
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = bold
+            textSize = metrics.title
+        }
+        val lineH = ceil(metrics.titleLine).toInt().coerceAtLeast(1)
+        return splitPages(musicTexts(info, access).first, textPaint, width.toFloat()).map { page ->
+            val bitmap = Bitmap.createBitmap(width.coerceAtLeast(1), lineH, Bitmap.Config.ARGB_8888)
+            drawLine(Canvas(bitmap), page, 0f, 0f, width.toFloat(), metrics.title, metrics.titleLine, bold, fg)
+            bitmap
+        }
+    }
+
+    /** Artist line plus, in the large style, the progress row. */
+    fun musicDetails(width: Int, areaHeight: Int, info: MediaInfo?, access: Boolean, progress: Boolean): Bitmap {
+        val metrics = MusicMetrics(areaHeight.toFloat(), progress, pxPerDp)
+        val bitmap = Bitmap.createBitmap(width.coerceAtLeast(1), ceil(metrics.details).toInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+        drawDetails(Canvas(bitmap), 0f, 0f, width.toFloat(), metrics, info, access, progress)
         return bitmap
     }
 
-    /**
-     * Title, artist and (optionally) a progress row, vertically centred. Text size follows the
-     * widget's height but stays between 10 and 16 dp, so it reads like normal widget text.
-     */
-    private fun drawMusicInfo(canvas: Canvas, box: RectF, info: MediaInfo?, access: Boolean, progress: Boolean) {
-        val title: String
-        val subtitle: String
-        when {
-            !access -> {
-                title = "ACTIVA EL ACCESO"
-                subtitle = "Toca para configurar"
-            }
-            info == null -> {
-                title = "NADA SONANDO"
-                subtitle = "Toca play para reanudar"
-            }
-            else -> {
-                title = info.title.uppercase(locale)
-                subtitle = info.artist
-            }
-        }
-        val titleSize = (box.height() * if (progress) 0.2f else 0.28f)
-            .coerceIn(10f * pxPerDp, 16f * pxPerDp)
-            .coerceAtMost(box.height() * 0.4f)
-        val subtitleSize = titleSize * 0.8f
-        val titleH = titleSize * 1.25f
-        val subtitleH = subtitleSize * 1.3f
-        val dotR = titleSize * 0.13f
-        val rowGap = titleSize * 0.5f
-        val total = titleH + subtitleH + if (progress) rowGap + dotR * 2f else 0f
-        var y = box.centerY() - total / 2f
-        drawLine(canvas, title, box.left, y, box.width(), titleSize, titleH, bold, fg)
-        y += titleH
-        drawLine(canvas, subtitle, box.left, y, box.width(), subtitleSize, subtitleH, light, dim)
-        y += subtitleH
+    private fun drawDetails(canvas: Canvas, x: Float, top: Float, width: Float, metrics: MusicMetrics, info: MediaInfo?, access: Boolean, progress: Boolean) {
+        drawLine(canvas, musicTexts(info, access).second, x, top, width, metrics.subtitle, metrics.subtitleLine, light, secondary)
         if (!progress) return
-        y += rowGap + dotR
+        val y = top + metrics.subtitleLine + metrics.rowGap + metrics.dotR
         val fraction = if (info != null && info.durationMs > 0) (info.positionMs.toFloat() / info.durationMs).coerceIn(0f, 1f) else 0f
-        val cols = (box.width() / (dotR * 3.2f)).toInt().coerceIn(8, 60)
-        val step = box.width() / cols
+        val cols = (width / (metrics.dotR * 3.2f)).toInt().coerceIn(8, 60)
+        val step = width / cols
         val filled = (fraction * cols).toInt()
         for (i in 0 until cols) {
             paint.color = when {
@@ -634,8 +643,36 @@ class Renderer(
                 i == filled -> accent
                 else -> dim
             }
-            canvas.drawCircle(box.left + step * (i + 0.5f), y, dotR, paint)
+            canvas.drawCircle(x + step * (i + 0.5f), y, metrics.dotR, paint)
         }
+    }
+
+    /** Greedy word wrap into one-line pages; at most [MAX_TITLE_PAGES], the last one ellipsized if needed. */
+    private fun splitPages(text: String, textPaint: TextPaint, width: Float): List<String> {
+        val words = text.split(' ').filter { it.isNotEmpty() }
+        if (words.isEmpty()) return listOf(" ")
+        val pages = mutableListOf<String>()
+        var line = ""
+        for (word in words) {
+            val candidate = if (line.isEmpty()) word else "$line $word"
+            if (line.isEmpty() || textPaint.measureText(candidate) <= width) {
+                line = candidate
+            } else {
+                pages += line
+                line = word
+            }
+        }
+        pages += line
+        if (pages.size <= MAX_TITLE_PAGES) return pages
+        return pages.take(MAX_TITLE_PAGES - 1) + pages.drop(MAX_TITLE_PAGES - 1).joinToString(" ")
+    }
+
+    /** Static version for previews: first title page (ellipsized) and details, vertically centred. */
+    private fun drawMusicInfo(canvas: Canvas, box: RectF, info: MediaInfo?, access: Boolean, progress: Boolean) {
+        val metrics = MusicMetrics(box.height(), progress, pxPerDp)
+        val top = box.centerY() - (metrics.titleLine + metrics.details) / 2f
+        drawLine(canvas, musicTexts(info, access).first, box.left, top, box.width(), metrics.title, metrics.titleLine, bold, fg)
+        drawDetails(canvas, box.left, top + metrics.titleLine, box.width(), metrics, info, access, progress)
     }
 
     /** One line of text at a fixed size, cut with an ellipsis when too long. */
@@ -767,5 +804,7 @@ class Renderer(
 
     private fun contrastOn(color: Int): Int = if (luminance(color) > 0.6) Color.BLACK else Color.WHITE
 }
+
+private const val MAX_TITLE_PAGES = 5
 
 private fun column(col: Int, rows: IntRange): List<Pair<Int, Int>> = rows.map { col to it }

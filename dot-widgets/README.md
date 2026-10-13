@@ -26,6 +26,7 @@ Funciona con Spotify y con cualquier reproductor que publique una sesión multim
 - Necesita **acceso a notificaciones** (la app te lleva a esa pantalla). Solo se usa para leer la música en reproducción.
 - Android 13+ bloquea ese permiso en apps instaladas desde un APK. Si el interruptor sale gris: Ajustes → Apps → Dot Widgets → menú ⋮ → **Permitir ajustes restringidos**, y vuelve a activarlo.
 - La canción, la carátula y el estado se actualizan al instante; la barra de progreso avanza cada minuto.
+- Si el título no cabe en una línea, se muestra entero por partes que se deslizan cada ~2,5 s, como un letrero.
 - Si no suena nada, ▶ reanuda el último reproductor y al tocar el widget se abre Spotify.
 
 ## Personalización
