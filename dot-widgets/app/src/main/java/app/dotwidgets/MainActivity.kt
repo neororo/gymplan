@@ -16,24 +16,49 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import app.dotwidgets.Ui.dp
 
-/** Catalogue of widgets to add, the widgets already on the home screen, and the clock permission hint. */
+/**
+ * Two tabs: the widgets already on the home screen (with permission hints and shared settings)
+ * and the catalogue of widgets that can be added.
+ */
 class MainActivity : Activity() {
 
+    private enum class Tab { MINE, AVAILABLE }
+
+    private lateinit var tabBar: LinearLayout
+    private lateinit var scroll: ScrollView
     private lateinit var content: LinearLayout
+    private var tab: Tab? = null
+    private var lastPlacedCount = -1
     private var wallpaperStyle = WallpaperStyle.BLACK
     private var wallpaperTarget = Wallpapers.TARGET_BOTH
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         content = Ui.column(this)
-        setContentView(ScrollView(this).apply {
+        scroll = ScrollView(this).apply { addView(content) }
+        tabBar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        tab = savedInstanceState?.getString(STATE_TAB)?.let { Tab.valueOf(it) }
+        setContentView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Ui.BLACK)
             fitsSystemWindows = true
-            addView(content)
+            addView(Ui.title(this@MainActivity, getString(R.string.app_name)).apply {
+                setPadding(dp(20), dp(16), dp(20), dp(4))
+            })
+            addView(tabBar)
+            addView(android.view.View(this@MainActivity).apply { setBackgroundColor(0xFF262626.toInt()) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)))
+            addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         })
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        tab?.let { outState.putString(STATE_TAB, it.name) }
     }
 
     // Rebuilt on every resume: previews show the current time and any widget added meanwhile.
@@ -42,47 +67,109 @@ class MainActivity : Activity() {
         render()
     }
 
-    private fun render() {
-        content.removeAllViews()
-        content.addView(Ui.title(this, getString(R.string.app_name)))
-        content.addView(Ui.body(this, getString(R.string.hint)))
+    private fun placedWidgets(): List<Pair<WidgetKind, Int>> {
+        val manager = AppWidgetManager.getInstance(this)
+        return WidgetKind.entries.flatMap { kind -> Scheduler.ids(this, manager, kind).map { kind to it } }
+    }
 
+    private fun render() {
+        val placed = placedWidgets()
+        // First open: start where there is something to see. After adding a widget: show it.
+        if (tab == null) tab = if (placed.isEmpty()) Tab.AVAILABLE else Tab.MINE
+        if (lastPlacedCount >= 0 && placed.size > lastPlacedCount) tab = Tab.MINE
+        lastPlacedCount = placed.size
+
+        renderTabs(placed.size)
+        content.removeAllViews()
+        when (tab) {
+            Tab.AVAILABLE -> renderAvailable(placed)
+            else -> renderMine(placed)
+        }
+    }
+
+    private fun selectTab(selected: Tab) {
+        if (tab == selected) return
+        tab = selected
+        render()
+        scroll.scrollTo(0, 0)
+    }
+
+    private fun renderTabs(placedCount: Int) {
+        tabBar.removeAllViews()
+        val labels = listOf(
+            Tab.MINE to getString(R.string.tab_mine, placedCount),
+            Tab.AVAILABLE to getString(R.string.tab_available, WidgetKind.entries.size),
+        )
+        for ((value, label) in labels) {
+            val selected = value == tab
+            tabBar.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(0, dp(10), 0, dp(8))
+                isClickable = true
+                contentDescription = label
+                setOnClickListener { selectTab(value) }
+                addView(TextView(this@MainActivity).apply {
+                    text = label
+                    typeface = resources.getFont(R.font.doto_bold)
+                    textSize = 15f
+                    letterSpacing = 0.08f
+                    isAllCaps = true
+                    setTextColor(if (selected) Ui.WHITE else Ui.MUTED)
+                })
+                // Nothing-style indicator: a red dot under the active tab.
+                addView(android.view.View(this@MainActivity).apply {
+                    background = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.OVAL
+                        setColor(if (selected) Ui.RED else 0)
+                    }
+                }, LinearLayout.LayoutParams(dp(6), dp(6)).apply { topMargin = dp(6) })
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+    }
+
+    private fun renderMine(placed: List<Pair<WidgetKind, Int>>) {
         if (!Scheduler.canTickExactly(this) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            content.addView(Ui.body(this, getString(R.string.exact_alarm_hint), Ui.WHITE).apply { setPadding(0, dp(16), 0, 0) })
+            content.addView(Ui.body(this, getString(R.string.exact_alarm_hint), Ui.WHITE))
             content.addView(button(getString(R.string.exact_alarm_button)) {
                 startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:$packageName")))
             })
         }
-
         if (MusicViews.hasPlaced(this) && !MediaState.hasAccess(this)) {
-            content.addView(Ui.body(this, getString(R.string.music_access_hint), Ui.WHITE).apply { setPadding(0, dp(16), 0, 0) })
+            content.addView(Ui.body(this, getString(R.string.music_access_hint), Ui.WHITE).apply { setPadding(0, dp(8), 0, 0) })
             content.addView(button(getString(R.string.music_access_button)) { MediaState.openAccessSettings(this) })
             content.addView(Ui.body(this, getString(R.string.music_access_restricted)))
         }
 
-        if (Wallpapers.canSet(this)) addWallpaperSection()
-
-        content.addView(Ui.section(this, R.string.section_weather))
-        content.addView(WeatherUi.section(this) { render() })
-
-        val manager = AppWidgetManager.getInstance(this)
-        val placed = WidgetKind.entries.flatMap { kind -> Scheduler.ids(this, manager, kind).map { kind to it } }
-        content.addView(Ui.section(this, R.string.section_my_widgets))
         if (placed.isEmpty()) {
             content.addView(Ui.body(this, getString(R.string.no_widgets)))
+            content.addView(button(getString(R.string.show_available)) { selectTab(Tab.AVAILABLE) })
+        } else {
+            content.addView(Ui.body(this, getString(R.string.hint_mine)))
         }
+        val manager = AppWidgetManager.getInstance(this)
         for ((kind, id) in placed) {
             val config = WidgetStore.load(this, id, kind)
             val (w, h) = WidgetViews.sizeDp(manager.getAppWidgetOptions(id), kind)
-            content.addView(row(kind, Previews.render(this, kind, config, w, h, dp(140)), getString(R.string.edit)) {
+            val style = getString(kind.styles[config.style.coerceIn(0, kind.styles.size - 1)])
+            content.addView(row(kind, Previews.render(this, kind, config, w, h, dp(140)), style, getString(R.string.edit)) {
                 startActivity(ConfigActivity.intent(this, id))
             })
         }
 
-        content.addView(Ui.section(this, R.string.section_add))
+        content.addView(Ui.section(this, R.string.section_settings))
+        content.addView(Ui.section(this, R.string.section_weather).apply { textSize = 13f })
+        content.addView(WeatherUi.section(this) { render() })
+        if (Wallpapers.canSet(this)) addWallpaperSection()
+    }
+
+    private fun renderAvailable(placed: List<Pair<WidgetKind, Int>>) {
+        content.addView(Ui.body(this, getString(R.string.hint)))
         for (kind in WidgetKind.entries) {
             val preview = Previews.render(this, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, dp(140))
-            content.addView(row(kind, preview, getString(R.string.add_widget)) { pin(kind) })
+            val inUse = placed.count { it.first == kind }
+            val note = if (inUse > 0) getString(R.string.in_use, inUse) else getString(kind.description)
+            content.addView(row(kind, preview, note, getString(R.string.add_widget)) { pin(kind) })
         }
     }
 
@@ -93,7 +180,7 @@ class MainActivity : Activity() {
 
     /** Plain wallpapers (black by default) so the widgets stand out on the home screen. */
     private fun addWallpaperSection() {
-        content.addView(Ui.section(this, R.string.section_wallpaper))
+        content.addView(Ui.section(this, R.string.section_wallpaper).apply { textSize = 13f })
         content.addView(Ui.body(this, getString(R.string.wallpaper_hint)))
 
         val (screenW, screenH) = Wallpapers.screenSize(this)
@@ -168,12 +255,12 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    private fun row(kind: WidgetKind, preview: android.graphics.Bitmap, action: String, onClick: () -> Unit): LinearLayout {
+    private fun row(kind: WidgetKind, preview: android.graphics.Bitmap, subtitle: String, action: String, onClick: () -> Unit): LinearLayout {
         val texts = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), 0, dp(8), 0)
             addView(Ui.title(this@MainActivity, getString(kind.title), 18f))
-            addView(Ui.body(this@MainActivity, getString(kind.description)))
+            addView(Ui.body(this@MainActivity, subtitle))
         }
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -211,5 +298,9 @@ class MainActivity : Activity() {
             flags,
         )
         manager.requestPinAppWidget(ComponentName(this, kind.provider), null, onPinned)
+    }
+
+    private companion object {
+        const val STATE_TAB = "tab"
     }
 }

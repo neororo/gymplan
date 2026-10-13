@@ -56,8 +56,6 @@
     <string name="section_period">Periodo</string>
     <string name="section_event">Evento</string>
     <string name="section_text">Texto</string>
-    <string name="section_my_widgets">Tus widgets</string>
-    <string name="section_add">Añadir widget</string>
 
     <string name="option_accent">Usar color de acento</string>
     <string name="option_show_date">Mostrar fecha</string>
@@ -122,11 +120,18 @@
     <string name="weather_offline">Sin conexión. Inténtalo de nuevo.</string>
     <string name="weather_attribution">Datos del tiempo: Open-Meteo.com (CC BY 4.0)</string>
 
+    <string name="tab_mine">Tus widgets · %1$d</string>
+    <string name="tab_available">Disponibles · %1$d</string>
+    <string name="section_settings">Ajustes</string>
+    <string name="show_available">Ver disponibles</string>
+    <string name="hint_mine">Toca Editar para cambiar el estilo, los colores o el tamaño de cada widget.</string>
+    <string name="in_use">En tu pantalla: %1$d</string>
+
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>
     <string name="add_widget">Añadir</string>
     <string name="no_widgets">Aún no tienes widgets en la pantalla de inicio.</string>
-    <string name="hint">Añade un widget y personalízalo: estilo, colores, tipografía, fondo y tamaño. Toca Editar para cambiarlo después.</string>
+    <string name="hint">Pulsa Añadir para ponerlo en tu pantalla de inicio. Después podrás personalizarlo.</string>
     <string name="pin_unsupported">Tu launcher no permite añadir widgets desde la app. Mantén pulsada la pantalla de inicio → Widgets → Dot Widgets.</string>
     <string name="exact_alarm_hint">Para que el reloj cambie justo en cada minuto, permite las alarmas exactas.</string>
     <string name="exact_alarm_button">Permitir</string>
