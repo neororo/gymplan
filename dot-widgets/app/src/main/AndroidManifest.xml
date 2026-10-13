@@ -13,6 +13,29 @@
     <!-- Android 14+: required to schedule jobs with a network constraint (WeatherJob). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Steps widget (hardware step counter). -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <!-- Next-event widget. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Quick settings widget: Do Not Disturb toggle, Wi-Fi and Bluetooth state. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+
+    <uses-feature
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.flash"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.wifi"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.bluetooth"
+        android:required="false" />
 
     <!-- So the music widget can open Spotify when nothing is playing. -->
     <queries>
@@ -147,6 +170,70 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_weather_info" />
         </receiver>
+
+        <receiver
+            android:name=".EventsWidget"
+            android:exported="true"
+            android:label="@string/events_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_events_info" />
+        </receiver>
+
+        <receiver
+            android:name=".StepsWidget"
+            android:exported="true"
+            android:label="@string/steps_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_steps_info" />
+        </receiver>
+
+        <receiver
+            android:name=".PhotoWidget"
+            android:exported="true"
+            android:label="@string/photo_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_photo_info" />
+        </receiver>
+
+        <receiver
+            android:name=".StorageWidget"
+            android:exported="true"
+            android:label="@string/storage_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_storage_info" />
+        </receiver>
+
+        <receiver
+            android:name=".QuickWidget"
+            android:exported="true"
+            android:label="@string/quick_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_info" />
+        </receiver>
+
+        <receiver
+            android:name=".QuickActionReceiver"
+            android:exported="false" />
 
         <receiver
             android:name=".WeatherRefreshReceiver"

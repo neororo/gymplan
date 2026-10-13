@@ -44,6 +44,26 @@ enum class WidgetKind(
     WEATHER(
         WeatherWidget::class.java, R.string.weather_name, R.string.weather_desc,
         listOf(R.string.style_now, R.string.style_hourly, R.string.style_week), 180, 180,
+    ),
+    EVENTS(
+        EventsWidget::class.java, R.string.events_name, R.string.events_desc,
+        listOf(R.string.style_next, R.string.style_agenda), 250, 110,
+    ),
+    STEPS(
+        StepsWidget::class.java, R.string.steps_name, R.string.steps_desc,
+        listOf(R.string.style_ring, R.string.style_bar), 110, 110,
+    ),
+    PHOTO(
+        PhotoWidget::class.java, R.string.photo_name, R.string.photo_desc,
+        listOf(R.string.style_fill, R.string.style_fit), 180, 180,
+    ),
+    STORAGE(
+        StorageWidget::class.java, R.string.storage_name, R.string.storage_desc,
+        listOf(R.string.style_ring, R.string.style_bar), 110, 110,
+    ),
+    QUICK(
+        QuickWidget::class.java, R.string.quick_name, R.string.quick_desc,
+        listOf(R.string.style_buttons), 250, 70,
     );
 
     companion object {

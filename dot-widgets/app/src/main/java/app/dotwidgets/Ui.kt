@@ -83,10 +83,11 @@ object Ui {
         }
     }
 
-    fun slider(context: Context, label: Int, min: Int, max: Int, value: Int, unit: String, onChange: (Int) -> Unit): View {
+    /** [min], [max] and [value] are in steps of [step]; [onChange] receives the real value. */
+    fun slider(context: Context, label: Int, min: Int, max: Int, value: Int, unit: String, step: Int = 1, onChange: (Int) -> Unit): View {
         val caption = body(context, "", WHITE)
         fun show(v: Int) {
-            caption.text = context.getString(label) + ": " + v + unit
+            caption.text = context.getString(label) + ": " + "%,d".format(v * step) + unit
         }
         show(value)
         val bar = SeekBar(context).apply {
@@ -98,7 +99,7 @@ object Ui {
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
                     show(progress)
-                    if (fromUser) onChange(progress)
+                    if (fromUser) onChange(progress * step)
                 }
 
                 override fun onStartTrackingTouch(seekBar: SeekBar) = Unit

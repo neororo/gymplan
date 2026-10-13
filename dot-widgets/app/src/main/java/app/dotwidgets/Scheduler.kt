@@ -26,7 +26,8 @@ object Scheduler {
     private const val REFRESH_REQUEST = 12
 
     // Music is here only to advance its progress bar; track changes arrive instantly via MediaListenerService.
-    private val MINUTE_KINDS = listOf(WidgetKind.CLOCK, WidgetKind.BATTERY, WidgetKind.MUSIC)
+    // Events and quick toggles are cheap to re-read and change with time or system state.
+    private val MINUTE_KINDS = listOf(WidgetKind.CLOCK, WidgetKind.BATTERY, WidgetKind.MUSIC, WidgetKind.EVENTS, WidgetKind.QUICK, WidgetKind.STEPS)
 
     fun refresh(context: Context) {
         val manager = AppWidgetManager.getInstance(context)
@@ -126,7 +127,17 @@ object Scheduler {
 
 /** The app's own alarms and the refresh tap. Not exported. */
 class TickReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) = Scheduler.onTick(context, intent.action)
+    override fun onReceive(context: Context, intent: Intent) {
+        Scheduler.onTick(context, intent.action)
+        // Step widgets need a fresh sensor reading, which arrives asynchronously.
+        if (Scheduler.ids(context, AppWidgetManager.getInstance(context), WidgetKind.STEPS).isNotEmpty()) {
+            val pending = goAsync()
+            StepCounter.read(context) {
+                Scheduler.update(context, listOf(WidgetKind.STEPS))
+                pending.finish()
+            }
+        }
+    }
 }
 
 /** System broadcasts: boot, app update, time and time zone changes, locale change, exact-alarm permission. */

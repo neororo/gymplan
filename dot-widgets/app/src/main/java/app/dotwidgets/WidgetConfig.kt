@@ -20,6 +20,9 @@ data class WidgetConfig(
     val targetEpochDay: Long = NO_DATE,
     val artMode: Int = ART_DOTS,
     val fahrenheit: Boolean = false,
+    val goal: Int = 8000,
+    val dotCount: Int = 32,
+    val photoUri: String = "",
 ) {
     fun toJson(): String = JSONObject()
         .put("style", style)
@@ -36,6 +39,9 @@ data class WidgetConfig(
         .put("targetEpochDay", targetEpochDay)
         .put("artMode", artMode)
         .put("fahrenheit", fahrenheit)
+        .put("goal", goal)
+        .put("dotCount", dotCount)
+        .put("photoUri", photoUri)
         .toString()
 
     fun target(): LocalDate =
@@ -88,6 +94,9 @@ data class WidgetConfig(
                 targetEpochDay = o.optLong("targetEpochDay", fallback.targetEpochDay),
                 artMode = o.optInt("artMode", fallback.artMode),
                 fahrenheit = o.optBoolean("fahrenheit", fallback.fahrenheit),
+                goal = o.optInt("goal", fallback.goal).coerceIn(500, 100_000),
+                dotCount = o.optInt("dotCount", fallback.dotCount).coerceIn(8, 96),
+                photoUri = o.optString("photoUri", fallback.photoUri),
             )
         }
     }
@@ -98,9 +107,29 @@ object WidgetStore {
 
     fun load(context: Context, id: Int, kind: WidgetKind): WidgetConfig {
         val defaults = WidgetConfig.defaults(kind)
-        val json = prefs(context).getString(key(id), null) ?: return defaults
+        val json = prefs(context).getString(key(id), null)
+            ?: takePending(context, kind)?.also { prefs(context).edit().putString(key(id), it).apply() }
+            ?: return defaults
         return WidgetConfig.fromJson(json, defaults)
     }
+
+    /** Imported settings not yet matched to a widget; the next widget of [kind] takes the first one. */
+    fun setPending(context: Context, kind: WidgetKind, configs: List<String>) {
+        val editor = prefs(context).edit()
+        if (configs.isEmpty()) editor.remove(pendingKey(kind)) else editor.putString(pendingKey(kind), org.json.JSONArray(configs).toString())
+        editor.apply()
+    }
+
+    private fun takePending(context: Context, kind: WidgetKind): String? {
+        val raw = prefs(context).getString(pendingKey(kind), null) ?: return null
+        val queue = runCatching { org.json.JSONArray(raw) }.getOrNull() ?: return null
+        if (queue.length() == 0) return null
+        val first = queue.getString(0)
+        setPending(context, kind, (1 until queue.length()).map { queue.getString(it) })
+        return first
+    }
+
+    private fun pendingKey(kind: WidgetKind) = "pending_${kind.name}"
 
     fun save(context: Context, id: Int, config: WidgetConfig) {
         prefs(context).edit().putString(key(id), config.toJson()).apply()

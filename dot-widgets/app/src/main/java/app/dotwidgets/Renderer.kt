@@ -37,6 +37,12 @@ data class DeviceState(
     val media: MediaInfo? = null,
     val weather: WeatherData? = null,
     val weatherPlaceSet: Boolean = true,
+    val steps: Int = 0,
+    val stepsStatus: StepCounter.Status = StepCounter.Status.OK,
+    /** Null means no calendar permission. */
+    val events: List<CalendarEvent>? = emptyList(),
+    /** Used and total bytes. */
+    val storage: Pair<Long, Long> = 0L to 1L,
 )
 
 /**
@@ -103,6 +109,11 @@ class Renderer(
             WidgetKind.NOTE -> note(canvas, area)
             WidgetKind.MUSIC -> musicPreview(canvas, area, device.media ?: demoMedia())
             WidgetKind.WEATHER -> weather(canvas, area, device, now)
+            WidgetKind.EVENTS -> events(canvas, area, device.events, now)
+            WidgetKind.STEPS -> steps(canvas, area, device)
+            WidgetKind.PHOTO -> photo(canvas, area)
+            WidgetKind.STORAGE -> storage(canvas, area, device.storage)
+            WidgetKind.QUICK -> quickPreview(canvas, area)
         }
         return bitmap
     }
@@ -925,6 +936,305 @@ class Renderer(
         fitText(canvas, value, RectF(col.left + pad, col.top + h * 0.62f, col.right - pad, col.top + h * 0.8f), bold, fg, measureAs = "-00°")
         if (extra.isNotEmpty()) {
             fitText(canvas, extra, RectF(col.left + pad, col.top + h * 0.85f, col.right - pad, col.bottom), light, extraColor, measureAs = "-00°")
+        }
+    }
+
+    // ---- Steps and storage -------------------------------------------------------------------
+
+    /** Ring of [dots] dots filled to [fraction]; the shared shape of the battery, steps and storage rings. */
+    private fun dotRing(canvas: Canvas, cx: Float, cy: Float, r: Float, fraction: Float, active: Int, dots: Int = 24) {
+        val filled = (fraction.coerceIn(0f, 1f) * dots).roundToInt()
+        for (i in 0 until dots) {
+            val angle = Math.toRadians(-90.0 + i * 360.0 / dots)
+            paint.color = if (i < filled) active else dim
+            canvas.drawCircle(cx + (r * cos(angle)).toFloat(), cy + (r * sin(angle)).toFloat(), r * 0.075f, paint)
+        }
+    }
+
+    private fun dotBar(canvas: Canvas, box: RectF, fraction: Float, active: Int, cols: Int = 20) {
+        val filled = (fraction.coerceIn(0f, 1f) * cols).roundToInt()
+        val step = box.width() / cols
+        for (i in 0 until cols) {
+            paint.color = if (i < filled) active else dim
+            canvas.drawCircle(box.left + step * (i + 0.5f), box.centerY(), min(step, box.height()) * 0.34f, paint)
+        }
+    }
+
+    /** "Permission needed"-style message used by widgets that depend on a permission or sensor. */
+    private fun notice(canvas: Canvas, area: RectF, title: String, hint: String) {
+        fitText(canvas, title, RectF(area.left, area.top + area.height() * 0.3f, area.right, area.top + area.height() * 0.5f), bold, fg, Paint.Align.LEFT, "ACTIVA EL PERMISO")
+        fitText(canvas, hint, RectF(area.left, area.top + area.height() * 0.58f, area.right, area.top + area.height() * 0.72f), light, secondary, Paint.Align.LEFT, "Toca para configurar")
+    }
+
+    private fun steps(canvas: Canvas, area: RectF, device: DeviceState) {
+        when (device.stepsStatus) {
+            StepCounter.Status.NO_SENSOR -> return notice(canvas, area, "SIN SENSOR", "Este teléfono no cuenta pasos")
+            StepCounter.Status.NO_PERMISSION -> return notice(canvas, area, "ACTIVA EL PERMISO", "Toca para configurar")
+            StepCounter.Status.OK -> Unit
+        }
+        val fraction = device.steps / config.goal.toFloat()
+        val color = if (fraction >= 1f) accent else fg
+        if (config.style == 1) {
+            fitText(canvas, "%,d".format(locale, device.steps), RectF(area.left, area.top, area.right, area.top + area.height() * 0.5f), bold, fg, Paint.Align.LEFT, "00.000")
+            fitText(canvas, "PASOS · META %,d".format(locale, config.goal), RectF(area.left, area.top + area.height() * 0.56f, area.right, area.top + area.height() * 0.7f), light, secondary, Paint.Align.LEFT, "PASOS · META 00.000")
+            dotBar(canvas, RectF(area.left, area.top + area.height() * 0.78f, area.right, area.bottom), fraction, color)
+            return
+        }
+        val cx = area.centerX()
+        val cy = area.centerY()
+        val r = min(area.width(), area.height()) / 2f * 0.88f
+        dotRing(canvas, cx, cy, r, fraction, color)
+        fitText(canvas, "%,d".format(locale, device.steps), RectF(cx - r * 0.62f, cy - r * 0.32f, cx + r * 0.62f, cy + r * 0.12f), bold, fg, measureAs = "00.000")
+        fitText(canvas, "PASOS", RectF(cx - r * 0.4f, cy + r * 0.26f, cx + r * 0.4f, cy + r * 0.44f), bold, if (fraction >= 1f) accent else dim, measureAs = "PASOS")
+    }
+
+    private fun gigabytes(bytes: Long): String {
+        val gb = bytes / 1_000_000_000.0
+        return if (gb >= 100) "%.0f".format(locale, gb) else "%.1f".format(locale, gb)
+    }
+
+    private fun storage(canvas: Canvas, area: RectF, usage: Pair<Long, Long>) {
+        val (used, total) = usage
+        val fraction = used.toFloat() / total.coerceAtLeast(1)
+        val color = if (fraction >= 0.9f) accent else fg
+        val percent = "${(fraction * 100).roundToInt()}%"
+        val detail = "${gigabytes(used)} / ${gigabytes(total)} GB"
+        if (config.style == 1) {
+            fitText(canvas, percent, RectF(area.left, area.top, area.left + area.width() * 0.55f, area.top + area.height() * 0.5f), bold, fg, Paint.Align.LEFT, "100%")
+            fitText(canvas, "USADO", RectF(area.left + area.width() * 0.6f, area.top + area.height() * 0.08f, area.right, area.top + area.height() * 0.24f), bold, accent, Paint.Align.RIGHT, "USADO")
+            fitText(canvas, detail, RectF(area.left + area.width() * 0.5f, area.top + area.height() * 0.3f, area.right, area.top + area.height() * 0.46f), light, secondary, Paint.Align.RIGHT, "000 / 000 GB")
+            dotBar(canvas, RectF(area.left, area.top + area.height() * 0.66f, area.right, area.bottom), fraction, color)
+            return
+        }
+        val cx = area.centerX()
+        val cy = area.centerY()
+        val r = min(area.width(), area.height()) / 2f * 0.88f
+        dotRing(canvas, cx, cy, r, fraction, color)
+        fitText(canvas, percent, RectF(cx - r * 0.55f, cy - r * 0.34f, cx + r * 0.55f, cy + r * 0.12f), bold, fg, measureAs = "100%")
+        fitText(canvas, detail, RectF(cx - r * 0.55f, cy + r * 0.24f, cx + r * 0.55f, cy + r * 0.4f), light, secondary, measureAs = "000 / 000 GB")
+    }
+
+    // ---- Calendar events ---------------------------------------------------------------------
+
+    /** "AHORA", "HOY · 16:00", "MAÑANA · TODO EL DÍA", "MIÉ 15 · 09:30". */
+    private fun whenLabel(event: CalendarEvent, now: LocalDateTime): String {
+        val zone = if (event.allDay) java.time.ZoneOffset.UTC else java.time.ZoneId.systemDefault()
+        val start = java.time.Instant.ofEpochMilli(event.begin).atZone(zone).toLocalDateTime()
+        val nowMillis = now.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        if (!event.allDay && event.begin <= nowMillis && nowMillis < event.end) return "AHORA"
+        val day = when (start.toLocalDate()) {
+            now.toLocalDate() -> "HOY"
+            now.toLocalDate().plusDays(1) -> "MAÑANA"
+            else -> "${start.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).trimEnd('.')} ${start.dayOfMonth}"
+        }.uppercase(locale)
+        val time = if (event.allDay) "TODO EL DÍA" else "%02d:%02d".format(start.hour, start.minute)
+        return "$day · $time"
+    }
+
+    private fun events(canvas: Canvas, area: RectF, events: List<CalendarEvent>?, now: LocalDateTime) {
+        if (events == null) return notice(canvas, area, "ACTIVA EL PERMISO", "Toca para configurar")
+        if (events.isEmpty()) return notice(canvas, area, "SIN EVENTOS", "Nada en los próximos 7 días")
+        val h = area.height()
+        if (config.style == 1) {
+            fitText(canvas, "AGENDA", RectF(area.left, area.top, area.right, area.top + h * 0.14f), bold, accent, Paint.Align.LEFT, "AGENDA")
+            val rows = events.take(4)
+            val rowH = (h * 0.82f) / 4f
+            val labelW = area.width() * 0.36f
+            rows.forEachIndexed { i, event ->
+                val top = area.top + h * 0.18f + rowH * i
+                val label = whenLabel(event, now)
+                fitText(canvas, label, RectF(area.left, top + rowH * 0.2f, area.left + labelW - area.width() * 0.03f, top + rowH * 0.62f), light, if (label == "AHORA") accent else secondary, Paint.Align.LEFT, "MIÉ 00 · 00:00")
+                drawLine(canvas, event.title, area.left + labelW, top + rowH * 0.1f, area.width() - labelW, (rowH * 0.5f).coerceAtMost(16f * pxPerDp), rowH * 0.62f, bold, fg)
+            }
+            return
+        }
+        val event = events.first()
+        val label = whenLabel(event, now)
+        fitText(canvas, label, RectF(area.left, area.top, area.right, area.top + h * 0.16f), bold, accent, Paint.Align.LEFT, "MAÑANA · TODO EL DÍA")
+        // Title wraps over up to the middle of the widget, as large as fits.
+        val titleBox = RectF(area.left, area.top + h * 0.24f, area.right, area.top + h * (if (event.location.isBlank()) 0.92f else 0.76f))
+        wrappedText(canvas, event.title, titleBox, bold, fg, maxSize = 26f * pxPerDp)
+        if (event.location.isNotBlank()) {
+            drawLine(canvas, event.location, area.left, area.top + h * 0.8f, area.width(), min(h * 0.12f, 12f * pxPerDp), h * 0.16f, light, secondary)
+        }
+        if (events.size > 1) {
+            paint.color = dim
+            val dotR = h * 0.025f
+            for (i in 1 until min(events.size, 5)) {
+                canvas.drawCircle(area.right - dotR - (i - 1) * dotR * 3f, area.top + h * 0.08f, dotR, paint)
+            }
+        }
+    }
+
+    /** Multi-line text, largest size up to [maxSize] that fits [box] without breaking words. */
+    private fun wrappedText(canvas: Canvas, text: String, box: RectF, typeface: Typeface, color: Int, maxSize: Float) {
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.typeface = typeface
+            this.color = color
+        }
+        val width = box.width().toInt().coerceAtLeast(1)
+        val words = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        var lo = 4f
+        var hi = min(maxSize, box.height())
+        repeat(14) {
+            val mid = (lo + hi) / 2f
+            textPaint.textSize = mid
+            val layout = staticLayout(text, textPaint, width, Layout.Alignment.ALIGN_NORMAL)
+            if (layout.height <= box.height() && words.all { textPaint.measureText(it) <= width }) lo = mid else hi = mid
+        }
+        textPaint.textSize = lo
+        val layout = staticLayout(text, textPaint, width, Layout.Alignment.ALIGN_NORMAL)
+        canvas.save()
+        canvas.translate(box.left, box.top)
+        layout.draw(canvas)
+        canvas.restore()
+    }
+
+    // ---- Photo -------------------------------------------------------------------------------
+
+    private fun photo(canvas: Canvas, area: RectF) {
+        val source = loadPhoto()
+        if (source == null) {
+            val n = 8
+            val cell = min(area.width(), area.height()) / n
+            paint.color = dim
+            for (r in 0 until (area.height() / cell).toInt()) for (c in 0 until (area.width() / cell).toInt()) {
+                canvas.drawCircle(area.left + cell * (c + 0.5f), area.top + cell * (r + 0.5f), cell * 0.15f, paint)
+            }
+            val hint = if (config.photoUri.isBlank()) "ELIGE UNA FOTO" else "FOTO NO DISPONIBLE"
+            fitText(canvas, hint, RectF(area.left, area.centerY() - area.height() * 0.08f, area.right, area.centerY() + area.height() * 0.08f), bold, fg, measureAs = "FOTO NO DISPONIBLE")
+            return
+        }
+        // Fill: crop the photo to the widget. Fit: show the whole photo inside it.
+        val srcAspect = source.width.toFloat() / source.height
+        val boxAspect = area.width() / area.height()
+        val crop: Rect
+        val target: RectF
+        if (config.style == 1) {
+            crop = Rect(0, 0, source.width, source.height)
+            target = if (srcAspect > boxAspect) {
+                val h = area.width() / srcAspect
+                RectF(area.left, area.centerY() - h / 2f, area.right, area.centerY() + h / 2f)
+            } else {
+                val w = area.height() * srcAspect
+                RectF(area.centerX() - w / 2f, area.top, area.centerX() + w / 2f, area.bottom)
+            }
+        } else {
+            target = RectF(area)
+            crop = if (srcAspect > boxAspect) {
+                val w = (source.height * boxAspect).toInt()
+                Rect((source.width - w) / 2, 0, (source.width + w) / 2, source.height)
+            } else {
+                val h = (source.width / boxAspect).toInt()
+                Rect(0, (source.height - h) / 2, source.width, (source.height + h) / 2)
+            }
+        }
+        if (config.artMode == WidgetConfig.ART_PHOTO) {
+            val radius = min(target.width(), target.height()) * 0.06f
+            val clip = Path().apply { addRoundRect(target, radius, radius, Path.Direction.CW) }
+            canvas.save()
+            canvas.clipPath(clip)
+            canvas.drawBitmap(source, crop, target, Paint(Paint.FILTER_BITMAP_FLAG))
+            canvas.restore()
+            return
+        }
+        val cols = config.dotCount
+        val cell = target.width() / cols
+        val rows = (target.height() / cell).toInt().coerceAtLeast(1)
+        val cropped = Bitmap.createBitmap(source, crop.left, crop.top, crop.width().coerceAtLeast(1), crop.height().coerceAtLeast(1))
+        val small = Bitmap.createScaledBitmap(cropped, cols, rows, true)
+        val darkBackground = luminance(palette.bg) < 0.5
+        val top = target.top + (target.height() - rows * cell) / 2f
+        for (r in 0 until rows) for (c in 0 until cols) {
+            val pixel = small.getPixel(c, r)
+            val cx = target.left + cell * (c + 0.5f)
+            val cy = top + cell * (r + 0.5f)
+            if (config.artMode == WidgetConfig.ART_DOTS_COLOR) {
+                paint.color = pixel or (0xFF shl 24)
+                canvas.drawCircle(cx, cy, cell * 0.42f, paint)
+                continue
+            }
+            val l = luminance(pixel).toFloat()
+            val radius = cell * 0.5f * sqrt(if (darkBackground) l else 1f - l)
+            if (radius >= cell * 0.1f) {
+                paint.color = fg
+                canvas.drawCircle(cx, cy, radius, paint)
+            }
+        }
+    }
+
+    /** Decodes the chosen photo at a small size (it only feeds a dot grid or a widget-sized image). */
+    private fun loadPhoto(): Bitmap? {
+        if (config.photoUri.isBlank()) return null
+        return runCatching {
+            val uri = android.net.Uri.parse(config.photoUri)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                val source = android.graphics.ImageDecoder.createSource(context.contentResolver, uri)
+                android.graphics.ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                    val longest = maxOf(info.size.width, info.size.height)
+                    decoder.setTargetSampleSize((longest / 640).coerceAtLeast(1))
+                    decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+                }
+            } else {
+                val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }
+                context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
+            }
+        }.getOrNull()
+    }
+
+    // ---- Quick settings ----------------------------------------------------------------------
+
+    private object QuickIcons {
+        val TORCH = listOf(".#######.", ".#######.", "..#####..", "...###...", "...#.#...", "...###...", "...###...", "...###...", "...###...")
+        val WIFI = listOf(".........", ".#######.", "#.......#", "..#####..", ".#.....#.", "...###...", ".........", "....#....", ".........")
+        val BLUETOOTH = listOf("...##....", "...#.#...", ".#.#..#..", "..##.#...", "...##....", "..##.#...", ".#.#..#..", "...#.#...", "...##....")
+        val MOON = listOf("..####...", ".###.....", "###......", "###......", "###......", "###......", "###......", ".###.....", "..####...")
+
+        fun of(toggle: QuickToggle) = when (toggle) {
+            QuickToggle.TORCH -> TORCH
+            QuickToggle.WIFI -> WIFI
+            QuickToggle.BLUETOOTH -> BLUETOOTH
+            QuickToggle.DND -> MOON
+        }
+    }
+
+    private fun drawPattern(canvas: Canvas, box: RectF, rows: List<String>, color: Int) {
+        val cell = min(box.width(), box.height()) / 9f
+        val left = box.centerX() - cell * 4.5f
+        val top = box.centerY() - cell * 4.5f
+        paint.color = color
+        rows.forEachIndexed { r, row ->
+            row.forEachIndexed { c, ch ->
+                if (ch != '.') canvas.drawCircle(left + cell * (c + 0.5f), top + cell * (r + 0.5f), cell * 0.38f, paint)
+            }
+        }
+    }
+
+    private fun drawQuickButton(canvas: Canvas, box: RectF, toggle: QuickToggle, on: Boolean) {
+        val r = min(box.width(), box.height()) / 2f * 0.92f
+        paint.color = if (on) palette.accent else (fg and 0x00FFFFFF) or (0x22 shl 24)
+        canvas.drawCircle(box.centerX(), box.centerY(), r, paint)
+        val half = r * 0.55f
+        drawPattern(
+            canvas,
+            RectF(box.centerX() - half, box.centerY() - half, box.centerX() + half, box.centerY() + half),
+            QuickIcons.of(toggle),
+            if (on) contrastOn(palette.accent) else fg,
+        )
+    }
+
+    /** One round toggle button as its own bitmap (each is a separate tap target in the widget). */
+    fun quickButton(toggle: QuickToggle, on: Boolean, size: Int): Bitmap {
+        val side = size.coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+        drawQuickButton(Canvas(bitmap), RectF(0f, 0f, side.toFloat(), side.toFloat()), toggle, on)
+        return bitmap
+    }
+
+    private fun quickPreview(canvas: Canvas, area: RectF) {
+        val w = area.width() / 4f
+        QuickToggle.entries.forEachIndexed { i, toggle ->
+            drawQuickButton(canvas, RectF(area.left + w * i, area.top, area.left + w * (i + 1), area.bottom), toggle, i == 0 || i == 1)
         }
     }
 

@@ -14,7 +14,23 @@ App Android de widgets para la pantalla de inicio en estilo matriz de puntos, in
 | Cuenta atrás | Días hasta (o desde) una fecha con título | Abre el editor |
 | Nota | Texto propio, centrado o a la izquierda | Abre el editor |
 | Tiempo | Ahora, por horas, semana · °C o °F | Actualiza el pronóstico |
+| Próximo evento | Próximo, agenda | Abre el evento |
+| Pasos | Anillo, barra · meta diaria | Actualiza |
+| Foto | Rellenar, completa · puntos, puntos a color o foto | Cambia la foto |
+| Almacenamiento | Anillo, barra | Abre el almacenamiento |
+| Ajustes rápidos | Linterna, Wi-Fi, Bluetooth, No molestar | Cada botón por separado |
 | Música | Compacto, grande, carátula · carátula en puntos, puntos a color o foto | Abre el reproductor; botones ⏮ ⏯ ⏭ |
+
+## Permisos de los widgets nuevos
+
+- **Pasos**: permiso de actividad física. Lee el sensor de pasos del teléfono en cada actualización (cada minuto, sin servicio en segundo plano) y guarda una base diaria.
+- **Próximo evento**: lectura del calendario (solo lectura), eventos visibles de los próximos 7 días.
+- **Foto**: ninguno; eliges la foto con el selector del sistema y la app conserva el acceso a esa foto.
+- **Ajustes rápidos**: la linterna funciona directamente; No molestar necesita el acceso a No molestar. Android no permite que otras apps enciendan Wi-Fi o Bluetooth, así que esos botones abren su panel (el widget sí muestra si están encendidos).
+
+## Copia de seguridad
+
+En **Tus widgets → Ajustes → Copia de seguridad**: **Exportar** guarda un JSON con los ajustes de todos los widgets y la ciudad del tiempo; **Importar** los aplica. Como los ids de los widgets cambian al reinstalar o cambiar de teléfono, se asignan por tipo y orden; los que sobren se aplican a los siguientes widgets de ese tipo que añadas. La foto elegida no se puede trasladar entre teléfonos.
 
 ## Fondo de pantalla
 

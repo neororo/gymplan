@@ -162,6 +162,63 @@ class MainActivity : Activity() {
         content.addView(Ui.section(this, R.string.section_weather).apply { textSize = 13f })
         content.addView(WeatherUi.section(this) { render() })
         if (Wallpapers.canSet(this)) addWallpaperSection()
+        addBackupSection()
+    }
+
+    private fun addBackupSection() {
+        content.addView(Ui.section(this, R.string.section_backup).apply { textSize = 13f })
+        content.addView(Ui.body(this, getString(R.string.backup_hint)))
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(4), 0, 0)
+            addView(button(getString(R.string.backup_export)) {
+                startActivityForResult(
+                    Intent(Intent.ACTION_CREATE_DOCUMENT)
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("application/json")
+                        .putExtra(Intent.EXTRA_TITLE, "dot-widgets-copia.json"),
+                    EXPORT_REQUEST,
+                )
+            })
+            addView(android.view.View(this@MainActivity), LinearLayout.LayoutParams(dp(12), 1))
+            addView(button(getString(R.string.backup_import)) {
+                // Some file managers label .json files as text or binary, so accept those too.
+                startActivityForResult(
+                    Intent(Intent.ACTION_OPEN_DOCUMENT)
+                        .addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("*/*")
+                        .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain", "application/octet-stream")),
+                    IMPORT_REQUEST,
+                )
+            })
+        })
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        when (requestCode) {
+            EXPORT_REQUEST -> {
+                val ok = runCatching {
+                    val json = Backup.export(this)
+                    contentResolver.openOutputStream(uri, "wt")!!.use { it.write(json.toByteArray()) }
+                }.onFailure { CrashLog.record(this, "exportar copia", it) }.isSuccess
+                Toast.makeText(this, if (ok) R.string.backup_exported else R.string.backup_failed, Toast.LENGTH_SHORT).show()
+            }
+            IMPORT_REQUEST -> {
+                val applied = runCatching {
+                    val json = contentResolver.openInputStream(uri)!!.use { it.readBytes().toString(Charsets.UTF_8) }
+                    Backup.import(this, json)
+                }.onFailure { CrashLog.record(this, "importar copia", it) }.getOrNull()
+                if (applied == null) {
+                    Toast.makeText(this, R.string.backup_failed, Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, getString(R.string.backup_imported, applied), Toast.LENGTH_LONG).show()
+                    render()
+                }
+            }
+        }
     }
 
     /** Recent errors, copyable, so a problem on the phone can be reported without a computer. */
@@ -336,5 +393,7 @@ class MainActivity : Activity() {
 
     private companion object {
         const val STATE_TAB = "tab"
+        const val EXPORT_REQUEST = 81
+        const val IMPORT_REQUEST = 82
     }
 }

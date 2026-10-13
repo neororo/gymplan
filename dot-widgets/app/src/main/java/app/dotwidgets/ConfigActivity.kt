@@ -1,11 +1,14 @@
 package app.dotwidgets
 
+import android.Manifest
 import android.app.Activity
 import android.app.DatePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -33,6 +36,8 @@ class ConfigActivity : Activity() {
     private lateinit var config: WidgetConfig
     private lateinit var preview: ImageView
     private var accessBox: LinearLayout? = null
+    /** Redraws the permission section of the current widget kind (after returning from Settings). */
+    private var renderPermission: (() -> Unit)? = null
     private var previewWidthDp = 0
     private var previewHeightDp = 0
 
@@ -61,6 +66,7 @@ class ConfigActivity : Activity() {
         super.onResume()
         if (::preview.isInitialized) {
             renderAccess()
+            renderPermission?.invoke()
             updatePreview()
         }
     }
@@ -124,7 +130,7 @@ class ConfigActivity : Activity() {
 
         form.addView(Ui.section(this, R.string.section_shape))
         form.addView(Ui.slider(this, R.string.option_background, 0, 100, config.bgAlpha, "%") { set(config.copy(bgAlpha = it)) })
-        if (kind != WidgetKind.MUSIC) {
+        if (kind != WidgetKind.MUSIC && kind != WidgetKind.QUICK) {
             form.addView(Ui.slider(this, R.string.option_size, 60, 140, config.scale, "%") { set(config.copy(scale = it)) })
         }
         form.addView(Ui.body(this, getString(R.string.option_corners), Ui.WHITE))
@@ -215,6 +221,60 @@ class ConfigActivity : Activity() {
                     Ui.choices(this, listOf("°C", "°F"), if (config.fahrenheit) 1 else 0) { set(config.copy(fahrenheit = it == 1)) },
                 )
             }
+            WidgetKind.STEPS -> {
+                permissionSection(form) { box ->
+                    when (StepCounter.status(this)) {
+                        StepCounter.Status.OK -> box.addView(Ui.body(this, getString(R.string.permission_granted)))
+                        StepCounter.Status.NO_SENSOR -> box.addView(Ui.body(this, getString(R.string.steps_no_sensor), Ui.WHITE))
+                        StepCounter.Status.NO_PERMISSION -> requestRow(box, R.string.steps_permission_hint, R.string.permission_button) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                requestPermissions(arrayOf(Manifest.permission.ACTIVITY_RECOGNITION), STEPS_REQUEST)
+                            }
+                        }
+                    }
+                }
+                form.addView(Ui.slider(this, R.string.option_goal, 2, 60, config.goal / 500, "", step = 500) { set(config.copy(goal = it.coerceAtLeast(500))) })
+            }
+            WidgetKind.EVENTS -> permissionSection(form) { box ->
+                if (CalendarEvents.hasPermission(this)) {
+                    box.addView(Ui.body(this, getString(R.string.permission_granted)))
+                } else {
+                    requestRow(box, R.string.events_permission_hint, R.string.permission_button) {
+                        requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), EVENTS_REQUEST)
+                    }
+                }
+            }
+            WidgetKind.QUICK -> permissionSection(form) { box ->
+                if (QuickState.hasDndAccess(this)) {
+                    box.addView(Ui.body(this, getString(R.string.permission_granted)))
+                } else {
+                    requestRow(box, R.string.quick_dnd_hint, R.string.quick_dnd_button) {
+                        startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                    }
+                }
+            }
+            WidgetKind.PHOTO -> {
+                form.addView(Ui.section(this, R.string.photo_name))
+                form.addView(Button(this).apply {
+                    setText(if (config.photoUri.isBlank()) R.string.photo_pick else R.string.photo_change)
+                    setTextColor(Ui.WHITE)
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(Ui.RED)
+                    setOnClickListener {
+                        startActivityForResult(
+                            Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*"),
+                            PHOTO_REQUEST,
+                        )
+                    }
+                })
+                form.addView(
+                    Ui.choices(
+                        this,
+                        listOf(getString(R.string.art_dots), getString(R.string.art_dots_color), getString(R.string.art_photo)),
+                        config.artMode,
+                    ) { set(config.copy(artMode = it)) },
+                )
+                form.addView(Ui.slider(this, R.string.option_dots, 8, 96, config.dotCount, "") { set(config.copy(dotCount = it.coerceAtLeast(8))) })
+            }
             WidgetKind.NOTE -> {
                 form.addView(Ui.section(this, R.string.section_text))
                 form.addView(textField(config.text, multiLine = true) { set(config.copy(text = it)) })
@@ -226,6 +286,48 @@ class ConfigActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         WeatherUi.onPermissionResult(this, requestCode, grantResults)
+        renderPermission?.invoke()
+        if (requestCode == STEPS_REQUEST) {
+            StepCounter.read(this) {
+                updatePreview()
+                Scheduler.update(this, listOf(WidgetKind.STEPS))
+            }
+        } else {
+            updatePreview()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (requestCode != PHOTO_REQUEST || resultCode != RESULT_OK || uri == null) return
+        // Keep read access across reboots so the widget can redraw the photo later.
+        runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            .onFailure { CrashLog.record(this, "permiso de la foto", it) }
+        set(config.copy(photoUri = uri.toString()))
+    }
+
+    /** A section whose content depends on a permission; redrawn whenever the screen comes back. */
+    private fun permissionSection(form: LinearLayout, fill: (LinearLayout) -> Unit) {
+        form.addView(Ui.section(this, R.string.section_permission))
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        form.addView(box)
+        renderPermission = {
+            box.removeAllViews()
+            fill(box)
+        }
+        renderPermission?.invoke()
+    }
+
+    private fun requestRow(box: LinearLayout, hint: Int, button: Int, onClick: () -> Unit) {
+        box.addView(Ui.body(this, getString(hint), Ui.WHITE))
+        box.addView(Button(this).apply {
+            setText(button)
+            setTextColor(Ui.WHITE)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Ui.RED)
+            setOnClickListener { onClick() }
+        })
+        box.addView(Ui.body(this, getString(R.string.permission_settings)))
     }
 
     private fun textField(value: String, multiLine: Boolean, onChange: (String) -> Unit): EditText =
@@ -267,6 +369,10 @@ class ConfigActivity : Activity() {
     private fun resultIntent() = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
 
     companion object {
+        private const val STEPS_REQUEST = 72
+        private const val EVENTS_REQUEST = 73
+        private const val PHOTO_REQUEST = 74
+
         fun intent(context: Context, widgetId: Int): Intent =
             Intent(context, ConfigActivity::class.java)
                 .setAction("app.dotwidgets.action.EDIT_$widgetId")

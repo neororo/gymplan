@@ -27,6 +27,21 @@
     <string name="weather_name">Tiempo</string>
     <string name="weather_desc">Temperatura, previsión por horas o de la semana</string>
 
+    <string name="events_name">Próximo evento</string>
+    <string name="events_desc">Tu siguiente evento del calendario o la agenda</string>
+    <string name="steps_name">Pasos</string>
+    <string name="steps_desc">Pasos de hoy y tu meta, en anillo o barra</string>
+    <string name="photo_name">Foto</string>
+    <string name="photo_desc">Una foto tuya en trama de puntos</string>
+    <string name="storage_name">Almacenamiento</string>
+    <string name="storage_desc">Espacio usado del teléfono</string>
+    <string name="quick_name">Ajustes rápidos</string>
+    <string name="quick_desc">Linterna, Wi-Fi, Bluetooth y No molestar</string>
+    <string name="quick_torch">Linterna</string>
+    <string name="quick_wifi">Wi-Fi</string>
+    <string name="quick_bluetooth">Bluetooth</string>
+    <string name="quick_dnd">No molestar</string>
+
     <string name="style_digital">Digital</string>
     <string name="style_stacked">Apilado</string>
     <string name="style_analog">Analógico</string>
@@ -47,6 +62,12 @@
 
     <string name="style_now">Ahora</string>
     <string name="style_hourly">Por horas</string>
+
+    <string name="style_next">Próximo</string>
+    <string name="style_agenda">Agenda</string>
+    <string name="style_fill">Rellenar</string>
+    <string name="style_fit">Completa</string>
+    <string name="style_buttons">Botones</string>
 
     <string name="section_style">Estilo</string>
     <string name="section_colors">Colores</string>
@@ -132,6 +153,28 @@
     <string name="errors_copy">Copiar</string>
     <string name="errors_copied">Copiado</string>
     <string name="errors_clear">Borrar</string>
+
+    <string name="section_permission">Permiso</string>
+    <string name="permission_granted">Permiso concedido.</string>
+    <string name="permission_button">Dar permiso</string>
+    <string name="permission_settings">Si no aparece el aviso, actívalo en Ajustes → Apps → Dot Widgets → Permisos.</string>
+    <string name="steps_permission_hint">Para contar tus pasos, Dot Widgets necesita el permiso de actividad física.</string>
+    <string name="steps_no_sensor">Este teléfono no tiene sensor de pasos.</string>
+    <string name="option_goal">Meta diaria</string>
+    <string name="events_permission_hint">Para mostrar tus eventos, Dot Widgets necesita leer el calendario. No modifica nada.</string>
+    <string name="photo_pick">Elegir foto</string>
+    <string name="photo_change">Cambiar foto</string>
+    <string name="option_dots">Puntos por fila</string>
+    <string name="quick_dnd_hint">Para activar No molestar desde el widget, permite el acceso a No molestar. Wi-Fi y Bluetooth abren su panel: Android no deja que otras apps los enciendan.</string>
+    <string name="quick_dnd_button">Permitir No molestar</string>
+
+    <string name="section_backup">Copia de seguridad</string>
+    <string name="backup_hint">Guarda en un archivo los ajustes de tus widgets y la ciudad del tiempo, para recuperarlos al reinstalar o cambiar de teléfono.</string>
+    <string name="backup_export">Exportar</string>
+    <string name="backup_import">Importar</string>
+    <string name="backup_exported">Copia guardada</string>
+    <string name="backup_imported">Importado: %1$d widgets actualizados. El resto se aplicará a los que añadas.</string>
+    <string name="backup_failed">No se pudo leer o escribir la copia</string>
 
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>

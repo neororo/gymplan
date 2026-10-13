@@ -23,6 +23,14 @@ abstract class KindWidget(private val kind: WidgetKind) : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         ids.forEach { manager.updateAppWidget(it, WidgetViews.build(context, manager, it, kind)) }
         Scheduler.refresh(context)
+        if (kind == WidgetKind.STEPS) {
+            // Take a fresh step reading right away instead of waiting for the next tick.
+            val pending = goAsync()
+            StepCounter.read(context) {
+                Scheduler.update(context, listOf(WidgetKind.STEPS))
+                pending.finish()
+            }
+        }
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, newOptions: Bundle) {
@@ -49,6 +57,11 @@ class CountdownWidget : KindWidget(WidgetKind.COUNTDOWN)
 class NoteWidget : KindWidget(WidgetKind.NOTE)
 class MusicWidget : KindWidget(WidgetKind.MUSIC)
 class WeatherWidget : KindWidget(WidgetKind.WEATHER)
+class EventsWidget : KindWidget(WidgetKind.EVENTS)
+class StepsWidget : KindWidget(WidgetKind.STEPS)
+class PhotoWidget : KindWidget(WidgetKind.PHOTO)
+class StorageWidget : KindWidget(WidgetKind.STORAGE)
+class QuickWidget : KindWidget(WidgetKind.QUICK)
 
 object WidgetViews {
     // RemoteViews cross binder (~1 MB transaction limit), so keep the bitmap under ~720 KB.
@@ -88,13 +101,14 @@ object WidgetViews {
         val config = WidgetStore.load(context, id, kind)
         val palette = Palettes.find(context, config.palette)
         if (kind == WidgetKind.MUSIC) return MusicViews.build(context, manager.getAppWidgetOptions(id), id, config, palette)
+        if (kind == WidgetKind.QUICK) return QuickViews.build(context, manager.getAppWidgetOptions(id), config, palette)
         val (width, height) = contentSize(context, manager.getAppWidgetOptions(id), kind)
         val bitmap = Renderer(context, config, palette).render(
             kind,
             width,
             height,
             LocalDateTime.now(),
-            deviceState(context, withWeather = kind == WidgetKind.WEATHER),
+            deviceState(context, kind),
         )
         return RemoteViews(context.packageName, R.layout.widget_image).apply {
             setImageViewResource(R.id.bg, cornerDrawable(config.corner))
@@ -105,14 +119,19 @@ object WidgetViews {
         }
     }
 
-    fun deviceState(context: Context, withMedia: Boolean = false, withWeather: Boolean = false): DeviceState {
+    /** Gathers only what [kind] needs (each source has its own cost or permission). */
+    fun deviceState(context: Context, kind: WidgetKind): DeviceState {
         val battery = context.getSystemService(BatteryManager::class.java)
         return DeviceState(
             battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
             battery.isCharging,
-            media = if (withMedia) MediaState.current(context) else null,
-            weather = if (withWeather) WeatherStore.data(context) else null,
-            weatherPlaceSet = !withWeather || WeatherStore.place(context) != null,
+            media = if (kind == WidgetKind.MUSIC) MediaState.current(context) else null,
+            weather = if (kind == WidgetKind.WEATHER) WeatherStore.data(context) else null,
+            weatherPlaceSet = kind != WidgetKind.WEATHER || WeatherStore.place(context) != null,
+            steps = if (kind == WidgetKind.STEPS) StepCounter.today(context) else 0,
+            stepsStatus = if (kind == WidgetKind.STEPS) StepCounter.status(context) else StepCounter.Status.OK,
+            events = if (kind == WidgetKind.EVENTS) CalendarEvents.upcoming(context) else emptyList(),
+            storage = if (kind == WidgetKind.STORAGE) Storage.usage() else 0L to 1L,
         )
     }
 
@@ -149,6 +168,25 @@ object WidgetViews {
             } else {
                 WeatherRefreshReceiver.pending(context)
             }
+        WidgetKind.STEPS ->
+            if (StepCounter.status(context) == StepCounter.Status.NO_PERMISSION) {
+                activity(context, id, ConfigActivity.intent(context, id))
+            } else {
+                Scheduler.refreshIntent(context)
+            }
+        WidgetKind.EVENTS -> {
+            val next = if (CalendarEvents.hasPermission(context)) CalendarEvents.upcoming(context, 1)?.firstOrNull() else null
+            when {
+                !CalendarEvents.hasPermission(context) -> activity(context, id, ConfigActivity.intent(context, id))
+                next != null -> activity(
+                    context,
+                    id,
+                    Intent(Intent.ACTION_VIEW, android.content.ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, next.eventId)),
+                )
+                else -> activity(context, id, Intent(Intent.ACTION_VIEW, CalendarContract.CONTENT_URI.buildUpon().appendPath("time").build()))
+            }
+        }
+        WidgetKind.STORAGE -> activity(context, id, Intent(android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
         WidgetKind.CALENDAR, WidgetKind.DATE -> {
             val uri = CalendarContract.CONTENT_URI.buildUpon()
                 .appendPath("time")
@@ -194,7 +232,7 @@ object Previews {
             (width - 2 * padding).toInt(),
             (height - 2 * padding).toInt(),
             LocalDateTime.now(),
-            WidgetViews.deviceState(context, withMedia = kind == WidgetKind.MUSIC, withWeather = kind == WidgetKind.WEATHER),
+            WidgetViews.deviceState(context, kind),
         )
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
