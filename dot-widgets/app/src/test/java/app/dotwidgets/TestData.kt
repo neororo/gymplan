@@ -24,9 +24,19 @@ object TestData {
         return connection.inputStream.bufferedReader().use { it.readText() }
     }
 
-    /** Real forecast in CI (LIVE_API=1), otherwise the canned sample. */
+    /**
+     * Real forecast in CI (LIVE_API=1), otherwise the canned sample. Rendering tests only need
+     * realistic data, so a network hiccup falls back to the sample instead of failing them;
+     * the API contract itself is checked by OpenMeteoTest.
+     */
     fun forecast(place: String = "Santiago de Chile"): WeatherData {
-        val json = if (live) get("${OpenMeteo.FORECAST_URL}?${OpenMeteo.forecastQuery(-33.45, -70.66)}") else forecastJson
+        val json = if (live) {
+            runCatching { get("${OpenMeteo.FORECAST_URL}?${OpenMeteo.forecastQuery(-33.45, -70.66)}") }
+                .onFailure { println("Live forecast unavailable, using sample: $it") }
+                .getOrDefault(forecastJson)
+        } else {
+            forecastJson
+        }
         return OpenMeteo.parseForecast(json, place, System.currentTimeMillis())
     }
 }
