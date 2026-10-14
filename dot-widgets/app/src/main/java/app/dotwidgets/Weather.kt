@@ -61,7 +61,10 @@ object WeatherStore {
 }
 
 object WeatherApi {
-    private const val TIMEOUT_MS = 10_000
+    private const val CONNECT_TIMEOUT_MS = 15_000
+    private const val READ_TIMEOUT_MS = 20_000
+    private const val ATTEMPTS = 3
+    private const val RETRY_DELAY_MS = 4_000L
 
     /** Downloads and stores a fresh forecast, then redraws the weather widgets. Blocking. */
     fun refresh(context: Context): Boolean {
@@ -69,6 +72,10 @@ object WeatherApi {
         val data = try {
             val json = get("${OpenMeteo.FORECAST_URL}?${OpenMeteo.forecastQuery(place.latitude, place.longitude)}")
             OpenMeteo.parseForecast(json, place.name, System.currentTimeMillis())
+        } catch (error: java.io.IOException) {
+            // No signal, slow network or a server hiccup: keep the last forecast, the job retries
+            // later and the widget shows "act. HH:MM" once data is old. Not an app error.
+            return false
         } catch (error: Throwable) {
             CrashLog.record(context, "descarga del tiempo", error)
             return false
@@ -85,12 +92,29 @@ object WeatherApi {
         return OpenMeteo.parseGeocoding(get("${OpenMeteo.GEOCODING_URL}?name=$name&count=8&language=$language&format=json"))
     }
 
+    /** GET with a few quick retries for network errors (timeouts, dropped connections). */
     private fun get(url: String): String {
+        var lastError: java.io.IOException? = null
+        repeat(ATTEMPTS) { attempt ->
+            if (attempt > 0) Thread.sleep(RETRY_DELAY_MS * attempt)
+            try {
+                return getOnce(url)
+            } catch (error: java.io.IOException) {
+                lastError = error
+            }
+        }
+        throw lastError ?: java.io.IOException("Sin respuesta")
+    }
+
+    private fun getOnce(url: String): String {
         val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = TIMEOUT_MS
-        connection.readTimeout = TIMEOUT_MS
+        connection.connectTimeout = CONNECT_TIMEOUT_MS
+        connection.readTimeout = READ_TIMEOUT_MS
         try {
-            if (connection.responseCode != 200) throw IllegalStateException("HTTP ${connection.responseCode}")
+            val code = connection.responseCode
+            // Server-side trouble is worth retrying; anything else is a real error.
+            if (code in 500..599 || code == 429) throw java.io.IOException("HTTP $code")
+            if (code != 200) throw IllegalStateException("HTTP $code")
             return connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
             connection.disconnect()
