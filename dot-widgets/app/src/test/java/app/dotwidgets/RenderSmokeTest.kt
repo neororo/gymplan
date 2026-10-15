@@ -119,6 +119,14 @@ class RenderSmokeTest {
             Previews.render(context, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, 400)
         }
         Robolectric.buildActivity(MainActivity::class.java).setup().pause().resume()
+        // Each tab of the redesigned main screen (the tab is restored from saved state).
+        for (tab in listOf("MINE", "ADD", "SETTINGS")) {
+            val state = android.os.Bundle().apply { putString("tab", tab) }
+            Robolectric.buildActivity(MainActivity::class.java).setup(state).pause().resume()
+        }
+        CrashLog.record(context, "prueba", IllegalStateException("registro de ejemplo"))
+        Robolectric.buildActivity(MainActivity::class.java).setup(android.os.Bundle().apply { putString("tab", "SETTINGS") })
+        CrashLog.clear(context)
         assertTrue("no errors logged:\n${CrashLog.read(context)}", CrashLog.read(context).isEmpty())
     }
 }

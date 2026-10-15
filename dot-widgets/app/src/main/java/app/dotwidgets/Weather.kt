@@ -246,6 +246,17 @@ object WeatherUi {
     /** Called back after a place is set from a permission result; the latest section listens. */
     private var listener: (() -> Unit)? = null
 
+    /** "Buscar ciudad" or "Usar mi ubicación", for screens that show the place as a single row. */
+    fun chooseLocation(activity: Activity, onChanged: () -> Unit) {
+        listener = onChanged
+        AlertDialog.Builder(activity, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle(R.string.weather_location_title)
+            .setItems(arrayOf(activity.getString(R.string.weather_search), activity.getString(R.string.weather_my_location))) { _, which ->
+                if (which == 0) searchCity(activity, onChanged) else useMyLocation(activity)
+            }
+            .show()
+    }
+
     private fun button(activity: Activity, text: Int, onClick: () -> Unit) = Button(activity).apply {
         setText(text)
         setTextColor(Ui.WHITE)

@@ -141,12 +141,8 @@
     <string name="weather_offline">Sin conexión. Inténtalo de nuevo.</string>
     <string name="weather_attribution">Datos del tiempo: Open-Meteo.com (CC BY 4.0)</string>
 
-    <string name="tab_mine">Tus widgets · %1$d</string>
-    <string name="tab_available">Disponibles · %1$d</string>
-    <string name="section_settings">Ajustes</string>
-    <string name="show_available">Ver disponibles</string>
-    <string name="hint_mine">Toca Editar para cambiar el estilo, los colores o el tamaño de cada widget.</string>
-    <string name="in_use">En tu pantalla: %1$d</string>
+    <string name="show_available">Ver catálogo</string>
+    <string name="hint_mine">Toca un widget para editarlo</string>
 
     <string name="section_errors">Errores recientes</string>
     <string name="errors_hint">Algo falló. Copia este texto y envíalo para poder arreglarlo.</string>
@@ -176,11 +172,65 @@
     <string name="backup_imported">Importado: %1$d widgets actualizados. El resto se aplicará a los que añadas.</string>
     <string name="backup_failed">No se pudo leer o escribir la copia</string>
 
+    <string name="tab_widgets">Widgets</string>
+    <string name="tab_add">Añadir</string>
+    <string name="tab_settings">Ajustes</string>
+    <string name="empty_title">Aún nada</string>
+    <string name="hint_add">Toca + para ponerlo en tu pantalla</string>
+    <string name="in_use_short">En tu pantalla</string>
+    <string name="notice_permissions_title">Faltan permisos</string>
+    <plurals name="notice_permissions">
+        <item quantity="one">%1$d widget no puede mostrar sus datos · Revisar</item>
+        <item quantity="other">%1$d permisos pendientes · Revisar</item>
+    </plurals>
+
+    <string name="group_weather">Tiempo</string>
+    <string name="group_screen">Pantalla</string>
+    <string name="group_data">Tus datos</string>
+    <string name="group_help">Ayuda</string>
+    <string name="row_location">Ubicación</string>
+    <string name="row_backup_value">Exportar o importar tus widgets</string>
+    <string name="row_permissions">Permisos</string>
+    <string name="row_about">Acerca de</string>
+    <string name="row_about_value">Versión %1$s · Datos del tiempo: Open-Meteo</string>
+    <string name="value_not_set">Sin elegir</string>
+    <string name="value_not_applied">Sin aplicar</string>
+    <string name="value_all_set">Todo listo</string>
+    <string name="value_none">Ninguno</string>
+    <plurals name="pending_permissions">
+        <item quantity="one">%1$d pendiente</item>
+        <item quantity="other">%1$d pendientes</item>
+    </plurals>
+    <plurals name="error_count">
+        <item quantity="one">%1$d registro</item>
+        <item quantity="other">%1$d registros</item>
+    </plurals>
+    <string name="weather_location_title">Ubicación del tiempo</string>
+    <string name="wallpaper_target">Aplicar en</string>
+    <string name="wallpaper_home_only">Solo inicio</string>
+    <string name="wallpaper_lock_only">Solo bloqueo</string>
+
+    <string name="perm_hint">Cada widget pide solo lo que necesita. Puedes darlos o quitarlos cuando quieras.</string>
+    <string name="perm_music">Música</string>
+    <string name="perm_music_desc">Acceso a notificaciones, para leer lo que suena</string>
+    <string name="perm_steps">Pasos</string>
+    <string name="perm_steps_desc">Actividad física, para el sensor de pasos</string>
+    <string name="perm_calendar">Calendario</string>
+    <string name="perm_calendar_desc">Solo lectura, para tus próximos eventos</string>
+    <string name="perm_dnd">No molestar</string>
+    <string name="perm_dnd_desc">Para activarlo desde Ajustes rápidos</string>
+    <string name="perm_exact">Reloj al minuto</string>
+    <string name="perm_exact_desc">Alarmas exactas, para que la hora cambie justo a tiempo</string>
+    <string name="perm_granted_short">Concedido</string>
+    <string name="perm_grant">Dar</string>
+    <string name="perm_no_sensor">Sin sensor</string>
+    <string name="errors_none">No hay errores registrados.</string>
+    <string name="about_text">Widgets de puntos hechos desde cero, sin anuncios ni rastreo. Lo que configuras se queda en tu teléfono.\n\nTipografía Doto, de Óliver Lalan (SIL Open Font License 1.1).\nDatos del tiempo: Open-Meteo.com (CC BY 4.0).</string>
+
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>
     <string name="add_widget">Añadir</string>
-    <string name="no_widgets">Aún no tienes widgets en la pantalla de inicio.</string>
-    <string name="hint">Pulsa Añadir para ponerlo en tu pantalla de inicio. Después podrás personalizarlo.</string>
+    <string name="no_widgets">Aún no tienes widgets en tu pantalla de inicio. Elige uno del catálogo.</string>
     <string name="pin_unsupported">Tu launcher no permite añadir widgets desde la app. Mantén pulsada la pantalla de inicio → Widgets → Dot Widgets.</string>
     <string name="exact_alarm_hint">Para que el reloj cambie justo en cada minuto, permite las alarmas exactas.</string>
     <string name="exact_alarm_button">Permitir</string>

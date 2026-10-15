@@ -59,11 +59,22 @@ object Wallpapers {
             else -> WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
         }
         manager.setBitmap(render(context, style, width, height), null, true, flags)
+        prefs(context).edit().putString("style", style.name).putInt("target", target).apply()
     }
+
+    /** The last wallpaper applied from the app, to show it in Ajustes; null if none or restored. */
+    fun applied(context: Context): Pair<WallpaperStyle, Int>? {
+        val p = prefs(context)
+        val style = WallpaperStyle.entries.firstOrNull { it.name == p.getString("style", null) } ?: return null
+        return style to p.getInt("target", TARGET_BOTH)
+    }
+
+    private fun prefs(context: Context) = context.getSharedPreferences("wallpaper", Context.MODE_PRIVATE)
 
     /** Back to the phone's default wallpaper (the previous custom one can't be read back). */
     fun restoreDefault(context: Context) {
         WallpaperManager.getInstance(context).clear()
+        prefs(context).edit().clear().apply()
     }
 
     fun canSet(context: Context): Boolean {
