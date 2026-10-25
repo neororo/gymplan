@@ -61,8 +61,8 @@ class MainActivity : Activity() {
             addView(TextView(this@MainActivity).apply {
                 text = getString(R.string.app_name)
                 typeface = Design.dots(this@MainActivity)
-                textSize = 34f
-                isAllCaps = true
+                textSize = if (ThemeStore.soft) 28f else 34f
+                isAllCaps = Design.caps
                 setTextColor(Ui.WHITE)
                 setPadding(dp(20), dp(20), dp(20), dp(8))
             })
@@ -130,7 +130,7 @@ class MainActivity : Activity() {
                     text = label
                     typeface = Design.dots(this@MainActivity)
                     textSize = 15f
-                    isAllCaps = true
+                    isAllCaps = Design.caps
                     maxLines = 1
                     setTextColor(if (selected) Ui.WHITE else Design.GRAY)
                 })
@@ -300,6 +300,11 @@ class MainActivity : Activity() {
     // ---- Tab: settings -----------------------------------------------------------------------
 
     private fun renderSettings(placed: List<Pair<WidgetKind, Int>>) {
+        content.addView(Design.groupLabel(this, getString(R.string.group_look)))
+        content.addView(Design.group(this, listOf(
+            Design.row(this, getString(R.string.row_style), getString(styleLabel(ThemeStore.current))) { openStyle() },
+        )))
+
         content.addView(Design.groupLabel(this, getString(R.string.group_weather)))
         content.addView(Design.group(this, listOf(
             Design.row(this, getString(R.string.row_location), WeatherStore.place(this)?.name ?: getString(R.string.value_not_set)) {
@@ -365,6 +370,70 @@ class MainActivity : Activity() {
     )
 
     // ---- Sheets ------------------------------------------------------------------------------
+
+    private fun styleLabel(style: VisualStyle): Int = when (style) {
+        VisualStyle.DOTS -> R.string.style_dots
+        VisualStyle.SOFT -> R.string.style_soft
+    }
+
+    /** Pick the app-wide look: each option shows the clock widget drawn in that style. */
+    private fun openStyle() {
+        var chosen = ThemeStore.current
+        Design.sheet(this, getString(R.string.row_style), getString(R.string.style_hint)) { body, dialog ->
+            val cardW = (resources.displayMetrics.widthPixels - dp(48) - dp(12)) / 2
+            val frames = mutableListOf<View>()
+            val labels = mutableListOf<TextView>()
+            fun paint() {
+                VisualStyle.entries.forEachIndexed { i, s ->
+                    val selected = s == chosen
+                    frames[i].background = Design.rounded(0, 18f, this, if (selected) Ui.RED else 0xFF505050.toInt(), if (selected) 3 else 1)
+                    labels[i].setTextColor(if (selected) Ui.WHITE else Design.GRAY)
+                    labels[i].typeface = if (selected) Design.sansMedium else Design.sans
+                }
+            }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(20), 0, dp(16))
+            }
+            val kind = WidgetKind.CLOCK
+            VisualStyle.entries.forEachIndexed { i, s ->
+                val frame = FrameLayout(this).apply {
+                    setPadding(dp(8), dp(8), dp(8), dp(8))
+                    addView(ImageView(this@MainActivity).apply {
+                        setImageBitmap(Previews.safeRender(this@MainActivity, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, cardW - dp(16), s))
+                        adjustViewBounds = true
+                    }, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                    setOnClickListener {
+                        chosen = s
+                        paint()
+                    }
+                }
+                val label = Design.text(this, getString(styleLabel(s)), 13f, Design.GRAY).apply {
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(8), 0, 0)
+                }
+                frames += frame
+                labels += label
+                row.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(frame)
+                    addView(label)
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    if (i > 0) marginStart = dp(12)
+                })
+            }
+            paint()
+            body.addView(row)
+            body.addView(Design.primaryButton(this, getString(R.string.style_apply)) {
+                dialog.dismiss()
+                if (chosen != ThemeStore.current) {
+                    ThemeStore.set(this, chosen)
+                    Scheduler.update(this)
+                    recreate()
+                }
+            })
+        }
+    }
 
     private fun openWallpaper() {
         var style = Wallpapers.applied(this)?.first ?: WallpaperStyle.BLACK

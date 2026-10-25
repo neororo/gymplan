@@ -57,10 +57,19 @@ class Renderer(
     private val locale: Locale = Locale.getDefault(),
     /** Bitmap pixels per dp; lower than the screen density when a bitmap is drawn small and scaled up. */
     private val pxPerDp: Float = context.resources.displayMetrics.density,
+    private val visual: VisualStyle = ThemeStore.current,
 ) {
     private val bold: Typeface
     private val light: Typeface
+    /** Big numbers (time, temperature, values). Thin in the soft style, like One UI's clock. */
+    private val display: Typeface
+    private val soft = visual == VisualStyle.SOFT
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
     private val bounds = Rect()
     private val fg = palette.fg
     private val dim = palette.dim
@@ -76,11 +85,15 @@ class Renderer(
                 bold = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
                 light = Typeface.MONOSPACE
             }
-            else -> {
+            else -> if (soft) {
+                bold = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                light = Typeface.create("sans-serif", Typeface.NORMAL)
+            } else {
                 bold = context.resources.getFont(R.font.doto_bold)
                 light = context.resources.getFont(R.font.doto_regular)
             }
         }
+        display = if (soft && config.font == WidgetConfig.FONT_DOTS) Typeface.create("sans-serif-light", Typeface.NORMAL) else bold
     }
 
     fun render(kind: WidgetKind, width: Int, height: Int, now: LocalDateTime, device: DeviceState): Bitmap {
@@ -155,6 +168,10 @@ class Renderer(
 
     /** HH:MM with the colon drawn as two accent dots; the font's own colon glyph reads poorly. */
     private fun drawTime(canvas: Canvas, box: RectF, hours: String, minutes: String) {
+        if (soft) {
+            fitText(canvas, "$hours:$minutes", box, display, fg, measureAs = "00:00")
+            return
+        }
         paint.typeface = bold
         paint.textAlign = Paint.Align.LEFT
         paint.textSize = 100f
@@ -182,8 +199,8 @@ class Renderer(
         val left = RectF(area.left, area.top, area.right - sideW, area.bottom)
         val gap = area.height() * 0.06f
         val half = (left.height() - gap) / 2f
-        fitText(canvas, hourText(now), RectF(left.left, left.top, left.right, left.top + half), bold, fg, Paint.Align.LEFT, "00")
-        fitText(canvas, minuteText(now), RectF(left.left, left.bottom - half, left.right, left.bottom), bold, accent, Paint.Align.LEFT, "00")
+        fitText(canvas, hourText(now), RectF(left.left, left.top, left.right, left.top + half), display, fg, Paint.Align.LEFT, "00")
+        fitText(canvas, minuteText(now), RectF(left.left, left.bottom - half, left.right, left.bottom), display, accent, Paint.Align.LEFT, "00")
         if (config.showDate) {
             val date = now.toLocalDate()
             val x = area.right - sideW + sideW * 0.12f
@@ -198,6 +215,7 @@ class Renderer(
     }
 
     private fun analogClock(canvas: Canvas, area: RectF, now: LocalDateTime) {
+        if (soft) return softAnalogClock(canvas, area, now)
         val cx = area.centerX()
         val cy = area.centerY()
         val r = min(area.width(), area.height()) / 2f * 0.94f
@@ -244,31 +262,16 @@ class Renderer(
         val cx = area.centerX()
         val cy = area.centerY()
         val r = min(area.width(), area.height()) / 2f * 0.88f
-        val dots = 24
-        val filled = (device.batteryLevel.coerceIn(0, 100) * dots / 100f).roundToInt()
-        for (i in 0 until dots) {
-            val angle = Math.toRadians(-90.0 + i * 360.0 / dots)
-            paint.color = if (i < filled) batteryColor(device) else dim
-            canvas.drawCircle(cx + (r * cos(angle)).toFloat(), cy + (r * sin(angle)).toFloat(), r * 0.075f, paint)
-        }
-        fitText(canvas, device.batteryLevel.toString(), RectF(cx - r * 0.55f, cy - r * 0.38f, cx + r * 0.55f, cy + r * 0.18f), bold, fg, measureAs = "100")
+        dotRing(canvas, cx, cy, r, device.batteryLevel.coerceIn(0, 100) / 100f, batteryColor(device))
+        fitText(canvas, device.batteryLevel.toString(), RectF(cx - r * 0.55f, cy - r * 0.38f, cx + r * 0.55f, cy + r * 0.18f), display, fg, measureAs = "100")
         val label = if (device.charging) "CHG" else "%"
         fitText(canvas, label, RectF(cx - r * 0.3f, cy + r * 0.3f, cx + r * 0.3f, cy + r * 0.48f), bold, if (device.charging) accent else dim, measureAs = "CHG")
     }
 
     private fun batteryBar(canvas: Canvas, area: RectF, device: DeviceState) {
         val textBox = RectF(area.left, area.top, area.right, area.top + area.height() * 0.55f)
-        fitText(canvas, "${device.batteryLevel}%", textBox, bold, fg, Paint.Align.LEFT, "100%")
-        val rowTop = area.top + area.height() * 0.7f
-        val rowH = area.height() * 0.3f
-        val cols = 10
-        val cell = min(area.width() / cols, rowH)
-        val filled = (device.batteryLevel.coerceIn(0, 100) * cols / 100f).roundToInt()
-        for (i in 0 until cols) {
-            paint.color = if (i < filled) batteryColor(device) else dim
-            val x = area.left + area.width() / cols * (i + 0.5f)
-            canvas.drawCircle(x, rowTop + rowH / 2f, cell * 0.36f, paint)
-        }
+        fitText(canvas, "${device.batteryLevel}%", textBox, display, fg, Paint.Align.LEFT, "100%")
+        dotBar(canvas, RectF(area.left, area.top + area.height() * 0.7f, area.right, area.bottom), device.batteryLevel.coerceIn(0, 100) / 100f, batteryColor(device), cols = 10)
         if (device.charging) {
             fitText(canvas, "CHG", RectF(area.right - area.width() * 0.3f, area.top, area.right, area.top + area.height() * 0.2f), bold, accent, Paint.Align.RIGHT, "CHG")
         }
@@ -317,7 +320,7 @@ class Renderer(
 
     private fun weekCalendar(canvas: Canvas, area: RectF, today: LocalDate) {
         val topH = area.height() * 0.58f
-        fitText(canvas, today.dayOfMonth.toString(), RectF(area.left, area.top, area.left + area.width() * 0.42f, area.top + topH), bold, fg, Paint.Align.LEFT, "00")
+        fitText(canvas, today.dayOfMonth.toString(), RectF(area.left, area.top, area.left + area.width() * 0.42f, area.top + topH), display, fg, Paint.Align.LEFT, "00")
         val rightX = area.left + area.width() * 0.48f
         val weekday = today.dayOfWeek.getDisplayName(TextStyle.FULL_STANDALONE, locale).uppercase(locale)
         fitText(canvas, weekday, RectF(rightX, area.top + topH * 0.1f, area.right, area.top + topH * 0.45f), bold, accent, Paint.Align.LEFT, "MIÉRCOLES")
@@ -345,7 +348,7 @@ class Renderer(
     }
 
     private fun dateBig(canvas: Canvas, area: RectF, today: LocalDate) {
-        fitText(canvas, today.dayOfMonth.toString(), RectF(area.left, area.top, area.left + area.width() * 0.5f, area.bottom), bold, fg, Paint.Align.LEFT, "00")
+        fitText(canvas, today.dayOfMonth.toString(), RectF(area.left, area.top, area.left + area.width() * 0.5f, area.bottom), display, fg, Paint.Align.LEFT, "00")
         val x = area.left + area.width() * 0.55f
         val weekday = today.dayOfWeek.getDisplayName(TextStyle.FULL_STANDALONE, locale).uppercase(locale)
         val month = today.month.getDisplayName(TextStyle.FULL_STANDALONE, locale).uppercase(locale)
@@ -399,6 +402,10 @@ class Renderer(
             val textBox = RectF(area.left, area.top, area.right, area.top + area.height() * 0.4f)
             fitText(canvas, label, RectF(textBox.left, textBox.top, textBox.centerX(), textBox.bottom), bold, fg, Paint.Align.LEFT, "SEPTIEMBRE")
             fitText(canvas, percent, RectF(textBox.centerX(), textBox.top, textBox.right, textBox.bottom), bold, accent, Paint.Align.RIGHT, "100%")
+            if (soft) {
+                dotBar(canvas, RectF(area.left, area.top + area.height() * 0.6f, area.right, area.bottom), fraction, accent)
+                return
+            }
             val cols = 20
             val rowTop = area.top + area.height() * 0.55f
             val rowH = area.height() * 0.45f
@@ -438,6 +445,21 @@ class Renderer(
         val rows = ceil(total / bestCols.toFloat()).toInt()
         val startX = area.left + (area.width() - bestCols * bestCell) / 2f
         val startY = area.top + (area.height() - rows * bestCell) / 2f
+        if (soft) {
+            // Rounded tiles instead of dots.
+            val half = bestCell * 0.39f
+            for (i in 0 until total) {
+                paint.color = when {
+                    i < current -> fg
+                    i == current -> accent
+                    else -> dim
+                }
+                val x = startX + bestCell * (i % bestCols + 0.5f)
+                val y = startY + bestCell * (i / bestCols + 0.5f)
+                canvas.drawRoundRect(x - half, y - half, x + half, y + half, half * 0.5f, half * 0.5f, paint)
+            }
+            return
+        }
         for (i in 0 until total) {
             paint.color = when {
                 i < current -> fg
@@ -460,7 +482,7 @@ class Renderer(
         fitText(canvas, title, RectF(area.left, area.top, area.right, area.top + area.height() * 0.22f), bold, accent, Paint.Align.LEFT, "MMMMMMMMMM")
         val number = if (days == 0L) "HOY" else abs(days).toString()
         val numberBox = RectF(area.left, area.top + area.height() * 0.3f, area.left + area.width() * 0.68f, area.bottom)
-        fitText(canvas, number, numberBox, bold, fg, Paint.Align.LEFT, "000")
+        fitText(canvas, number, numberBox, display, fg, Paint.Align.LEFT, "000")
         if (days != 0L) {
             val unit = when {
                 days < 0 -> "DÍAS\nDESDE"
@@ -535,6 +557,7 @@ class Renderer(
     }
 
     private fun drawGlyph(canvas: Canvas, glyph: Glyph, box: RectF, color: Int) {
+        if (soft) return softGlyph(canvas, glyph, box, color)
         val cell = min(box.width() / 7f, box.height() / 7f)
         val left = box.centerX() - glyph.cols * cell / 2f
         val top = box.centerY() - glyph.rows * cell / 2f
@@ -556,6 +579,11 @@ class Renderer(
         val side = min(box.width(), box.height())
         val left = box.centerX() - side / 2f
         val top = box.centerY() - side / 2f
+        if (source == null && soft) {
+            paint.color = dim
+            canvas.drawRoundRect(left, top, left + side, top + side, side * 0.12f, side * 0.12f, paint)
+            return
+        }
         if (source == null) {
             val n = 10
             val cell = side / n
@@ -653,6 +681,10 @@ class Renderer(
         if (!progress) return
         val y = top + metrics.subtitleLine + metrics.rowGap + metrics.dotR
         val fraction = if (info != null && info.durationMs > 0) (info.positionMs.toFloat() / info.durationMs).coerceIn(0f, 1f) else 0f
+        if (soft) {
+            dotBar(canvas, RectF(x, y - metrics.dotR * 1.2f, x + width, y + metrics.dotR * 1.2f), fraction, if (info == null) dim else accent)
+            return
+        }
         val cols = (width / (metrics.dotR * 3.2f)).toInt().coerceIn(8, 60)
         val step = width / cols
         val filled = (fraction * cols).toInt()
@@ -823,6 +855,7 @@ class Renderer(
     }
 
     private fun drawWeatherIcon(canvas: Canvas, box: RectF, code: Int, isDay: Boolean) {
+        if (soft) return softWeatherIcon(canvas, box, code, isDay)
         val rows = WeatherIcons.of(code, isDay)
         val cell = min(box.width(), box.height()) / 9f
         val left = box.centerX() - cell * 4.5f
@@ -883,7 +916,7 @@ class Renderer(
         val iconSide = h * 0.42f
         val iconBox = RectF(area.left, area.top + h * 0.2f, area.left + iconSide, area.top + h * 0.2f + iconSide)
         drawWeatherIcon(canvas, iconBox, data.now.code, data.now.isDay)
-        fitText(canvas, degrees(data.now.temp), RectF(iconBox.right + h * 0.06f, iconBox.top, area.right, iconBox.bottom), bold, fg, Paint.Align.LEFT, "-00°")
+        fitText(canvas, degrees(data.now.temp), RectF(iconBox.right + h * 0.06f, iconBox.top, area.right, iconBox.bottom), display, fg, Paint.Align.LEFT, "-00°")
         val bottom = RectF(area.left, area.top + h * 0.72f, area.right, area.top + h * 0.86f)
         fitText(canvas, Condition.of(data.now.code).label.uppercase(locale), RectF(bottom.left, bottom.top, bottom.centerX(), bottom.bottom), bold, accent, Paint.Align.LEFT, "MMMMMMMM")
         fitText(canvas, todayRange(data), RectF(bottom.centerX(), bottom.top, bottom.right, bottom.bottom), bold, fg, Paint.Align.RIGHT, "-00° / -00°")
@@ -897,7 +930,7 @@ class Renderer(
         val iconBox = RectF(box.left, box.top, box.left + box.height(), box.bottom)
         drawWeatherIcon(canvas, iconBox, data.now.code, data.now.isDay)
         val tempRight = iconBox.right + box.height() * tempWidth
-        fitText(canvas, degrees(data.now.temp), RectF(iconBox.right + box.height() * 0.15f, box.top, tempRight, box.bottom), bold, fg, Paint.Align.LEFT, "-00°")
+        fitText(canvas, degrees(data.now.temp), RectF(iconBox.right + box.height() * 0.15f, box.top, tempRight, box.bottom), display, fg, Paint.Align.LEFT, "-00°")
         val textLeft = tempRight + box.height() * 0.15f
         fitText(canvas, data.place.uppercase(locale), RectF(textLeft, box.top, box.right, box.top + box.height() * 0.3f), bold, secondary, Paint.Align.RIGHT, "MMMMMMMMMMMM")
         fitText(canvas, Condition.of(data.now.code).label.uppercase(locale), RectF(textLeft, box.top + box.height() * 0.37f, box.right, box.top + box.height() * 0.63f), bold, accent, Paint.Align.RIGHT, "MMMMMMMM")
@@ -951,6 +984,18 @@ class Renderer(
 
     /** Ring of [dots] dots filled to [fraction]; the shared shape of the battery, steps and storage rings. */
     private fun dotRing(canvas: Canvas, cx: Float, cy: Float, r: Float, fraction: Float, active: Int, dots: Int = 24) {
+        if (soft) {
+            // Continuous arc over a faint track, rounded ends.
+            stroke.strokeWidth = r * 0.13f
+            stroke.color = dim
+            canvas.drawCircle(cx, cy, r, stroke)
+            val sweep = 360f * fraction.coerceIn(0f, 1f)
+            if (sweep > 0f) {
+                stroke.color = active
+                canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, sweep, false, stroke)
+            }
+            return
+        }
         val filled = (fraction.coerceIn(0f, 1f) * dots).roundToInt()
         for (i in 0 until dots) {
             val angle = Math.toRadians(-90.0 + i * 360.0 / dots)
@@ -960,6 +1005,18 @@ class Renderer(
     }
 
     private fun dotBar(canvas: Canvas, box: RectF, fraction: Float, active: Int, cols: Int = 20) {
+        if (soft) {
+            val h = min(box.height() * 0.5f, 14f * pxPerDp)
+            val top = box.centerY() - h / 2f
+            paint.color = dim
+            canvas.drawRoundRect(box.left, top, box.right, top + h, h / 2f, h / 2f, paint)
+            val w = box.width() * fraction.coerceIn(0f, 1f)
+            if (w > 0f) {
+                paint.color = active
+                canvas.drawRoundRect(box.left, top, box.left + w.coerceAtLeast(h), top + h, h / 2f, h / 2f, paint)
+            }
+            return
+        }
         val filled = (fraction.coerceIn(0f, 1f) * cols).roundToInt()
         val step = box.width() / cols
         for (i in 0 until cols) {
@@ -983,7 +1040,7 @@ class Renderer(
         val fraction = device.steps / config.goal.toFloat()
         val color = if (fraction >= 1f) accent else fg
         if (config.style == 1) {
-            fitText(canvas, "%,d".format(locale, device.steps), RectF(area.left, area.top, area.right, area.top + area.height() * 0.5f), bold, fg, Paint.Align.LEFT, "00.000")
+            fitText(canvas, "%,d".format(locale, device.steps), RectF(area.left, area.top, area.right, area.top + area.height() * 0.5f), display, fg, Paint.Align.LEFT, "00.000")
             fitText(canvas, "PASOS · META %,d".format(locale, config.goal), RectF(area.left, area.top + area.height() * 0.56f, area.right, area.top + area.height() * 0.7f), light, secondary, Paint.Align.LEFT, "PASOS · META 00.000")
             dotBar(canvas, RectF(area.left, area.top + area.height() * 0.78f, area.right, area.bottom), fraction, color)
             return
@@ -992,7 +1049,7 @@ class Renderer(
         val cy = area.centerY()
         val r = min(area.width(), area.height()) / 2f * 0.88f
         dotRing(canvas, cx, cy, r, fraction, color)
-        fitText(canvas, "%,d".format(locale, device.steps), RectF(cx - r * 0.62f, cy - r * 0.32f, cx + r * 0.62f, cy + r * 0.12f), bold, fg, measureAs = "00.000")
+        fitText(canvas, "%,d".format(locale, device.steps), RectF(cx - r * 0.62f, cy - r * 0.32f, cx + r * 0.62f, cy + r * 0.12f), display, fg, measureAs = "00.000")
         fitText(canvas, "PASOS", RectF(cx - r * 0.4f, cy + r * 0.26f, cx + r * 0.4f, cy + r * 0.44f), bold, if (fraction >= 1f) accent else dim, measureAs = "PASOS")
     }
 
@@ -1008,7 +1065,7 @@ class Renderer(
         val percent = "${(fraction * 100).roundToInt()}%"
         val detail = "${gigabytes(used)} / ${gigabytes(total)} GB"
         if (config.style == 1) {
-            fitText(canvas, percent, RectF(area.left, area.top, area.left + area.width() * 0.55f, area.top + area.height() * 0.5f), bold, fg, Paint.Align.LEFT, "100%")
+            fitText(canvas, percent, RectF(area.left, area.top, area.left + area.width() * 0.55f, area.top + area.height() * 0.5f), display, fg, Paint.Align.LEFT, "100%")
             fitText(canvas, "USADO", RectF(area.left + area.width() * 0.6f, area.top + area.height() * 0.08f, area.right, area.top + area.height() * 0.24f), bold, accent, Paint.Align.RIGHT, "USADO")
             fitText(canvas, detail, RectF(area.left + area.width() * 0.5f, area.top + area.height() * 0.3f, area.right, area.top + area.height() * 0.46f), light, secondary, Paint.Align.RIGHT, "000 / 000 GB")
             dotBar(canvas, RectF(area.left, area.top + area.height() * 0.66f, area.right, area.bottom), fraction, color)
@@ -1018,7 +1075,7 @@ class Renderer(
         val cy = area.centerY()
         val r = min(area.width(), area.height()) / 2f * 0.88f
         dotRing(canvas, cx, cy, r, fraction, color)
-        fitText(canvas, percent, RectF(cx - r * 0.55f, cy - r * 0.34f, cx + r * 0.55f, cy + r * 0.12f), bold, fg, measureAs = "100%")
+        fitText(canvas, percent, RectF(cx - r * 0.55f, cy - r * 0.34f, cx + r * 0.55f, cy + r * 0.12f), display, fg, measureAs = "100%")
         fitText(canvas, detail, RectF(cx - r * 0.55f, cy + r * 0.24f, cx + r * 0.55f, cy + r * 0.4f), light, secondary, measureAs = "000 / 000 GB")
     }
 
@@ -1219,7 +1276,7 @@ class Renderer(
         val h = area.height()
         fitText(canvas, series.indicator.longLabel, RectF(area.left, area.top, area.left + area.width() * 0.68f, area.top + h * 0.14f), bold, secondary, Paint.Align.LEFT, "UNIDAD TRIBUTARIA")
         fitText(canvas, dayLabel(latest.date, today), RectF(area.left + area.width() * 0.72f, area.top, area.right, area.top + h * 0.14f), bold, dim, Paint.Align.RIGHT, "00 MMM")
-        fitText(canvas, series.indicator.format(latest.value), RectF(area.left, area.top + h * 0.2f, area.right, area.top + h * 0.58f), bold, fg, Paint.Align.LEFT, "$00.000,00")
+        fitText(canvas, series.indicator.format(latest.value), RectF(area.left, area.top + h * 0.2f, area.right, area.top + h * 0.58f), display, fg, Paint.Align.LEFT, "$00.000,00")
         val (change, color) = changeText(series)
         fitText(canvas, change, RectF(area.left, area.top + h * 0.63f, area.right, area.top + h * 0.75f), bold, color, Paint.Align.LEFT, "SUBE $00,00 · 0,00%")
         sparkline(canvas, RectF(area.left, area.top + h * 0.82f, area.right, area.bottom), series)
@@ -1231,6 +1288,20 @@ class Renderer(
         if (values.size < 2) return
         val lo = values.minOrNull() ?: return
         val hi = values.maxOrNull() ?: return
+        if (soft) {
+            // A smooth line with the latest value marked.
+            val step = box.width() / (values.size - 1)
+            val pad = box.height() * 0.15f
+            fun yOf(v: Double) = box.bottom - pad - (if (hi - lo < 1e-9) 0.5f else ((v - lo) / (hi - lo)).toFloat()) * (box.height() - 2 * pad)
+            val path = Path()
+            values.forEachIndexed { i, v -> if (i == 0) path.moveTo(box.left, yOf(v)) else path.lineTo(box.left + step * i, yOf(v)) }
+            stroke.strokeWidth = box.height() * 0.08f
+            stroke.color = fg
+            canvas.drawPath(path, stroke)
+            paint.color = accent
+            canvas.drawCircle(box.right, yOf(values.last()), box.height() * 0.13f, paint)
+            return
+        }
         val step = box.width() / values.size
         val r = min(step * 0.3f, box.height() * 0.16f)
         values.forEachIndexed { i, v ->
@@ -1301,6 +1372,10 @@ class Renderer(
         paint.color = if (on) palette.accent else (fg and 0x00FFFFFF) or (0x22 shl 24)
         canvas.drawCircle(box.centerX(), box.centerY(), r, paint)
         val half = r * 0.55f
+        if (soft) {
+            softQuickIcon(canvas, RectF(box.centerX() - half, box.centerY() - half, box.centerX() + half, box.centerY() + half), toggle, if (on) contrastOn(palette.accent) else fg)
+            return
+        }
         drawPattern(
             canvas,
             RectF(box.centerX() - half, box.centerY() - half, box.centerX() + half, box.centerY() + half),
@@ -1321,6 +1396,196 @@ class Renderer(
         val w = area.width() / 4f
         QuickToggle.entries.forEachIndexed { i, toggle ->
             drawQuickButton(canvas, RectF(area.left + w * i, area.top, area.left + w * (i + 1), area.bottom), toggle, i == 0 || i == 1)
+        }
+    }
+
+    // ---- Soft style: vector shapes ------------------------------------------------------------
+
+    private fun softAnalogClock(canvas: Canvas, area: RectF, now: LocalDateTime) {
+        val cx = area.centerX()
+        val cy = area.centerY()
+        val r = min(area.width(), area.height()) / 2f * 0.94f
+        for (i in 0 until 12) {
+            val angle = Math.toRadians(i * 30.0 - 90)
+            val major = i % 3 == 0
+            stroke.color = if (major) fg else dim
+            stroke.strokeWidth = r * if (major) 0.045f else 0.03f
+            val inner = r * if (major) 0.8f else 0.86f
+            canvas.drawLine(
+                cx + (inner * cos(angle)).toFloat(), cy + (inner * sin(angle)).toFloat(),
+                cx + (r * 0.95f * cos(angle)).toFloat(), cy + (r * 0.95f * sin(angle)).toFloat(),
+                stroke,
+            )
+        }
+        val minutes = now.minute + now.second / 60f
+        val hours = now.hour % 12 + minutes / 60f
+        fun hand(degrees: Float, length: Float, width: Float) {
+            val angle = Math.toRadians(degrees - 90.0)
+            stroke.color = fg
+            stroke.strokeWidth = width
+            canvas.drawLine(cx, cy, cx + (length * cos(angle)).toFloat(), cy + (length * sin(angle)).toFloat(), stroke)
+        }
+        hand(hours * 30f, r * 0.5f, r * 0.08f)
+        hand(minutes * 6f, r * 0.74f, r * 0.05f)
+        paint.color = accent
+        canvas.drawCircle(cx, cy, r * 0.065f, paint)
+        if (config.showDate) {
+            fitText(canvas, now.dayOfMonth.toString(), RectF(cx + r * 0.3f, cy - r * 0.1f, cx + r * 0.62f, cy + r * 0.1f), bold, accent, measureAs = "00")
+        }
+    }
+
+    private fun softGlyph(canvas: Canvas, glyph: Glyph, box: RectF, color: Int) {
+        val s = min(box.width(), box.height()) * 0.8f
+        val cx = box.centerX()
+        val cy = box.centerY()
+        paint.color = color
+        stroke.color = color
+        stroke.strokeWidth = s * 0.12f
+        fun triangle(left: Float, right: Float, pointsRight: Boolean) {
+            val path = Path()
+            if (pointsRight) {
+                path.moveTo(left, cy - s * 0.42f); path.lineTo(right, cy); path.lineTo(left, cy + s * 0.42f)
+            } else {
+                path.moveTo(right, cy - s * 0.42f); path.lineTo(left, cy); path.lineTo(right, cy + s * 0.42f)
+            }
+            path.close()
+            canvas.drawPath(path, paint)
+            canvas.drawPath(path, stroke)
+        }
+        when (glyph) {
+            Glyph.PLAY -> triangle(cx - s * 0.3f, cx + s * 0.4f, true)
+            Glyph.PAUSE -> {
+                val w = s * 0.2f
+                canvas.drawRoundRect(cx - s * 0.32f, cy - s * 0.42f, cx - s * 0.32f + w, cy + s * 0.42f, w / 2f, w / 2f, paint)
+                canvas.drawRoundRect(cx + s * 0.12f, cy - s * 0.42f, cx + s * 0.12f + w, cy + s * 0.42f, w / 2f, w / 2f, paint)
+            }
+            Glyph.NEXT -> {
+                triangle(cx - s * 0.4f, cx + s * 0.2f, true)
+                canvas.drawLine(cx + s * 0.36f, cy - s * 0.38f, cx + s * 0.36f, cy + s * 0.38f, stroke)
+            }
+            Glyph.PREVIOUS -> {
+                triangle(cx - s * 0.2f, cx + s * 0.4f, false)
+                canvas.drawLine(cx - s * 0.36f, cy - s * 0.38f, cx - s * 0.36f, cy + s * 0.38f, stroke)
+            }
+        }
+    }
+
+    private fun softSun(canvas: Canvas, cx: Float, cy: Float, r: Float) {
+        paint.color = accent
+        canvas.drawCircle(cx, cy, r, paint)
+        stroke.color = accent
+        stroke.strokeWidth = r * 0.28f
+        for (i in 0 until 8) {
+            val a = Math.toRadians(i * 45.0)
+            canvas.drawLine(
+                cx + (r * 1.45f * cos(a)).toFloat(), cy + (r * 1.45f * sin(a)).toFloat(),
+                cx + (r * 1.85f * cos(a)).toFloat(), cy + (r * 1.85f * sin(a)).toFloat(),
+                stroke,
+            )
+        }
+    }
+
+    private fun softMoon(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
+        val moon = Path().apply { addCircle(cx, cy, r, Path.Direction.CW) }
+        val bite = Path().apply { addCircle(cx + r * 0.55f, cy - r * 0.35f, r * 0.85f, Path.Direction.CW) }
+        moon.op(bite, Path.Op.DIFFERENCE)
+        paint.color = color
+        canvas.drawPath(moon, paint)
+    }
+
+    /** A cloud [w] wide centred on (cx, cy): three bumps on a rounded base. */
+    private fun softCloud(canvas: Canvas, cx: Float, cy: Float, w: Float) {
+        paint.color = fg
+        canvas.drawCircle(cx - w * 0.2f, cy + w * 0.02f, w * 0.2f, paint)
+        canvas.drawCircle(cx + w * 0.04f, cy - w * 0.1f, w * 0.27f, paint)
+        canvas.drawCircle(cx + w * 0.27f, cy + w * 0.04f, w * 0.17f, paint)
+        canvas.drawRoundRect(cx - w * 0.4f, cy + w * 0.02f, cx + w * 0.44f, cy + w * 0.22f, w * 0.1f, w * 0.1f, paint)
+    }
+
+    private fun softWeatherIcon(canvas: Canvas, box: RectF, code: Int, isDay: Boolean) {
+        val s = min(box.width(), box.height())
+        val cx = box.centerX()
+        val cy = box.centerY()
+        when (Condition.of(code)) {
+            Condition.CLEAR -> if (isDay) softSun(canvas, cx, cy, s * 0.22f) else softMoon(canvas, cx, cy, s * 0.36f, fg)
+            Condition.PARTLY -> {
+                if (isDay) softSun(canvas, cx - s * 0.14f, cy - s * 0.14f, s * 0.15f) else softMoon(canvas, cx - s * 0.14f, cy - s * 0.14f, s * 0.22f, dim)
+                softCloud(canvas, cx + s * 0.05f, cy + s * 0.1f, s * 0.7f)
+            }
+            Condition.CLOUDY -> softCloud(canvas, cx, cy, s * 0.9f)
+            Condition.FOG -> {
+                stroke.color = fg
+                stroke.strokeWidth = s * 0.07f
+                listOf(-0.22f, 0f, 0.22f).forEachIndexed { i, dy ->
+                    val inset = if (i == 1) 0.05f else 0.15f
+                    canvas.drawLine(box.left + s * inset, cy + s * dy, box.right - s * (0.2f - inset), cy + s * dy, stroke)
+                }
+            }
+            Condition.DRIZZLE, Condition.RAIN -> {
+                softCloud(canvas, cx, cy - s * 0.12f, s * 0.8f)
+                stroke.color = accent
+                stroke.strokeWidth = s * 0.06f
+                val drops = if (Condition.of(code) == Condition.RAIN) listOf(-0.2f, 0f, 0.2f) else listOf(-0.1f, 0.12f)
+                drops.forEach { dx -> canvas.drawLine(cx + s * (dx + 0.04f), cy + s * 0.22f, cx + s * (dx - 0.04f), cy + s * 0.38f, stroke) }
+            }
+            Condition.SNOW -> {
+                softCloud(canvas, cx, cy - s * 0.12f, s * 0.8f)
+                paint.color = fg
+                listOf(-0.2f, 0f, 0.2f).forEach { dx -> canvas.drawCircle(cx + s * dx, cy + s * 0.32f, s * 0.045f, paint) }
+            }
+            Condition.STORM -> {
+                softCloud(canvas, cx, cy - s * 0.14f, s * 0.8f)
+                paint.color = accent
+                canvas.drawPath(Path().apply {
+                    moveTo(cx + s * 0.04f, cy + s * 0.08f)
+                    lineTo(cx - s * 0.1f, cy + s * 0.3f)
+                    lineTo(cx + s * 0.02f, cy + s * 0.3f)
+                    lineTo(cx - s * 0.06f, cy + s * 0.46f)
+                    lineTo(cx + s * 0.14f, cy + s * 0.22f)
+                    lineTo(cx + s * 0.02f, cy + s * 0.22f)
+                    close()
+                }, paint)
+            }
+        }
+    }
+
+    private fun softQuickIcon(canvas: Canvas, box: RectF, toggle: QuickToggle, color: Int) {
+        val s = min(box.width(), box.height())
+        val cx = box.centerX()
+        val cy = box.centerY()
+        paint.color = color
+        stroke.color = color
+        stroke.strokeWidth = s * 0.1f
+        when (toggle) {
+            QuickToggle.TORCH -> {
+                canvas.drawPath(Path().apply {
+                    moveTo(cx - s * 0.32f, cy - s * 0.42f)
+                    lineTo(cx + s * 0.32f, cy - s * 0.42f)
+                    lineTo(cx + s * 0.18f, cy - s * 0.12f)
+                    lineTo(cx - s * 0.18f, cy - s * 0.12f)
+                    close()
+                }, paint)
+                canvas.drawRoundRect(cx - s * 0.16f, cy - s * 0.1f, cx + s * 0.16f, cy + s * 0.46f, s * 0.06f, s * 0.06f, paint)
+            }
+            QuickToggle.WIFI -> {
+                listOf(0.46f, 0.31f, 0.16f).forEach { r ->
+                    val rr = s * r
+                    canvas.drawArc(cx - rr, cy + s * 0.3f - rr, cx + rr, cy + s * 0.3f + rr, 225f, 90f, false, stroke)
+                }
+                canvas.drawCircle(cx, cy + s * 0.3f, s * 0.07f, paint)
+            }
+            QuickToggle.BLUETOOTH -> {
+                stroke.strokeWidth = s * 0.08f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx - s * 0.22f, cy - s * 0.2f)
+                    lineTo(cx + s * 0.2f, cy + s * 0.2f)
+                    lineTo(cx, cy + s * 0.42f)
+                    lineTo(cx, cy - s * 0.42f)
+                    lineTo(cx + s * 0.2f, cy - s * 0.2f)
+                    lineTo(cx - s * 0.22f, cy + s * 0.2f)
+                }, stroke)
+            }
+            QuickToggle.DND -> softMoon(canvas, cx, cy, s * 0.4f, color)
         }
     }
 

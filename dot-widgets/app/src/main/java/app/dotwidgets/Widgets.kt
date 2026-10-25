@@ -212,9 +212,12 @@ object WidgetViews {
 /** Renders a widget the way it looks on the home screen, background included, for in-app previews. */
 object Previews {
     /** Like [render], but a failure becomes a logged, blank preview instead of crashing the screen. */
-    fun safeRender(context: Context, kind: WidgetKind, config: WidgetConfig, widthDp: Int, heightDp: Int, maxWidthPx: Int): Bitmap =
+    fun safeRender(
+        context: Context, kind: WidgetKind, config: WidgetConfig, widthDp: Int, heightDp: Int, maxWidthPx: Int,
+        visual: VisualStyle = ThemeStore.current,
+    ): Bitmap =
         try {
-            render(context, kind, config, widthDp, heightDp, maxWidthPx)
+            render(context, kind, config, widthDp, heightDp, maxWidthPx, visual)
         } catch (error: Throwable) {
             CrashLog.record(context, "vista previa ${kind.name}", error)
             Bitmap.createBitmap(maxWidthPx.coerceAtLeast(1), (maxWidthPx / 2).coerceAtLeast(1), Bitmap.Config.ARGB_8888).apply {
@@ -222,7 +225,10 @@ object Previews {
             }
         }
 
-    fun render(context: Context, kind: WidgetKind, config: WidgetConfig, widthDp: Int, heightDp: Int, maxWidthPx: Int): Bitmap {
+    fun render(
+        context: Context, kind: WidgetKind, config: WidgetConfig, widthDp: Int, heightDp: Int, maxWidthPx: Int,
+        visual: VisualStyle = ThemeStore.current,
+    ): Bitmap {
         val density = context.resources.displayMetrics.density
         val fit = min(1f, maxWidthPx / (widthDp * density))
         val width = (widthDp * density * fit).toInt().coerceAtLeast(1)
@@ -230,7 +236,7 @@ object Previews {
         val padding = 12 * density * fit
         val radius = WidgetConfig.CORNER_RADII[config.corner.coerceIn(0, 3)] * density * fit
         val palette = Palettes.find(context, config.palette)
-        val content = Renderer(context, config, palette, pxPerDp = density * fit).render(
+        val content = Renderer(context, config, palette, pxPerDp = density * fit, visual = visual).render(
             kind,
             (width - 2 * padding).toInt(),
             (height - 2 * padding).toInt(),

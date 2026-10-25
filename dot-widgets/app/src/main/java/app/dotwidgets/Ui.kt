@@ -22,7 +22,8 @@ object Ui {
     const val SURFACE = 0xFF161616.toInt()
     const val WHITE = 0xFFFFFFFF.toInt()
     const val MUTED = 0xFF8A8A8A.toInt()
-    const val RED = 0xFFD71921.toInt()
+    /** Accent: Nothing-style red for the dot style, a soft blue for the Suave style. */
+    val RED: Int get() = if (ThemeStore.soft) 0xFF3E91FF.toInt() else 0xFFD71921.toInt()
 
     fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
@@ -34,17 +35,17 @@ object Ui {
 
     fun title(context: Context, text: String, size: Float = 36f): TextView = TextView(context).apply {
         this.text = text
-        typeface = context.resources.getFont(R.font.doto_bold)
-        textSize = size
+        typeface = Design.dots(context)
+        textSize = if (ThemeStore.soft) size * 0.8f else size
         setTextColor(WHITE)
-        isAllCaps = true
+        isAllCaps = Design.caps
     }
 
     fun section(context: Context, text: Int): TextView = TextView(context).apply {
         setText(text)
-        typeface = context.resources.getFont(R.font.doto_bold)
+        typeface = Design.dots(context)
         textSize = 15f
-        letterSpacing = 0.15f
+        letterSpacing = if (ThemeStore.soft) 0.02f else 0.15f
         setTextColor(RED)
         isAllCaps = true
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {

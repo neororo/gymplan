@@ -61,15 +61,15 @@ class RenderSmokeTest {
         )
         val palettes = Palettes.all(context)
         var count = 0
-        for (kind in WidgetKind.entries) {
+        for (visual in VisualStyle.entries) for (kind in WidgetKind.entries) {
             for (config in configsFor(kind)) {
                 for ((w, h) in sizes) {
                     for (state in states) {
                         val palette = palettes[count % palettes.size]
                         try {
-                            Renderer(context, config, palette).render(kind, w * 2, h * 2, LocalDateTime.now(), state)
+                            Renderer(context, config, palette, visual = visual).render(kind, w * 2, h * 2, LocalDateTime.now(), state)
                         } catch (error: Throwable) {
-                            throw AssertionError("$kind style=${config.style} ${w}x$h weather=${state.weather != null}: $error", error)
+                            throw AssertionError("$visual $kind style=${config.style} ${w}x$h weather=${state.weather != null}: $error", error)
                         }
                         count++
                     }
@@ -96,8 +96,10 @@ class RenderSmokeTest {
     fun quickSettingsBuild() {
         val palette = Palettes.all(context).first()
         QuickViews.build(context, null, WidgetConfig.defaults(WidgetKind.QUICK), palette)
-        val renderer = Renderer(context, WidgetConfig(), palette)
-        QuickToggle.entries.forEach { renderer.quickButton(it, it.ordinal % 2 == 0, 120) }
+        for (visual in VisualStyle.entries) {
+            val renderer = Renderer(context, WidgetConfig(), palette, visual = visual)
+            QuickToggle.entries.forEach { renderer.quickButton(it, it.ordinal % 2 == 0, 120) }
+        }
     }
 
     @Test
@@ -129,6 +131,17 @@ class RenderSmokeTest {
             val state = android.os.Bundle().apply { putString("tab", tab) }
             Robolectric.buildActivity(MainActivity::class.java).setup(state).pause().resume()
         }
+        // The whole app in the soft style, then back.
+        ThemeStore.set(context, VisualStyle.SOFT)
+        for (kind in WidgetKind.entries) {
+            Previews.render(context, kind, WidgetConfig.defaults(kind), kind.widthDp, kind.heightDp, 400)
+        }
+        for (tab in listOf("MINE", "ADD", "SETTINGS")) {
+            Robolectric.buildActivity(MainActivity::class.java).setup(android.os.Bundle().apply { putString("tab", tab) }).pause().resume()
+        }
+        ThemeStore.load(context)
+        assertTrue(ThemeStore.current == VisualStyle.SOFT)
+        ThemeStore.set(context, VisualStyle.DOTS)
         CrashLog.record(context, "prueba", IllegalStateException("registro de ejemplo"))
         Robolectric.buildActivity(MainActivity::class.java).setup(android.os.Bundle().apply { putString("tab", "SETTINGS") })
         CrashLog.clear(context)

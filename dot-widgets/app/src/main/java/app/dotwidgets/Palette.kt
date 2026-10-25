@@ -30,6 +30,11 @@ object Palettes {
         Palette("rose", "Rosa", 0xFFF8E1E7.toInt(), 0xFF4A1F2B.toInt(), 0xFFE0457B.toInt()),
         Palette("mint", "Menta", 0xFFDFF5EA.toInt(), 0xFF17382A.toInt(), 0xFF1FA971.toInt()),
         Palette("ice", "Hielo", 0xFFE8F4FA.toInt(), 0xFF0F2A3A.toInt(), 0xFF00A3E0.toInt()),
+        // Made for the soft style: calm neutrals with one clear accent.
+        Palette("soft_light", "Claro suave", 0xFFF4F6FA.toInt(), 0xFF16181D.toInt(), 0xFF3E91FF.toInt()),
+        Palette("soft_dark", "Oscuro suave", 0xFF17191E.toInt(), 0xFFF5F7FA.toInt(), 0xFF4E9BFF.toInt()),
+        Palette("soft_mint", "Menta suave", 0xFFE8F6EF.toInt(), 0xFF13261D.toInt(), 0xFF2DBE7E.toInt()),
+        Palette("soft_coral", "Coral suave", 0xFFFFF1EC.toInt(), 0xFF2B1611.toInt(), 0xFFFF6B4A.toInt()),
     )
 
     /** Material You palettes first (Android 12+), then the fixed presets. */

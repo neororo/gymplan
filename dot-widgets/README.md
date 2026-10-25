@@ -65,11 +65,18 @@ Funciona con Spotify y con cualquier reproductor que publique una sesión multim
 - Si el título no cabe en una línea, se muestra entero por partes que se deslizan cada ~2,5 s, como un letrero.
 - Si no suena nada, ▶ reanuda el último reproductor y al tocar el widget se abre Spotify.
 
+## Estilo de la app
+
+En **Ajustes → Apariencia → Estilo** se elige entre dos aspectos, que se aplican a la app y a todos los widgets a la vez:
+
+- **Puntos**: la matriz de puntos de siempre, con letra Doto y acento rojo.
+- **Suave**: inspirado en la línea limpia de One UI (sin usar sus fuentes ni iconos): números finos, anillos y barras continuas con bordes redondeados, iconos vectoriales para el tiempo, la música y los ajustes rápidos, gráfico de línea en el tipo de cambio y acento azul. Combina mejor con las paletas «suave».
+
 ## Personalización
 
 Cada widget tiene su propio editor con vista previa en vivo. Se abre al añadirlo y luego desde **Tus widgets → Editar** en la app (o manteniendo pulsado el widget en Android 12+):
 
-- 21 paletas de color, incluidas 3 de Material You (Android 12+)
+- 25 paletas de color, incluidas 3 de Material You (Android 12+) y 4 pensadas para el estilo Suave
 - Color de acento activable
 - Tipografía: puntos (Doto), sans o mono
 - Opacidad del fondo (0–100 %) y cuatro tipos de esquinas

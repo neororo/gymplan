@@ -36,7 +36,12 @@ object Design {
     val sans: Typeface = Typeface.create("sans-serif", Typeface.NORMAL)
     val sansMedium: Typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
 
-    fun dots(context: Context): Typeface = context.resources.getFont(R.font.doto_bold)
+    /** Title font: the dot font, or the system's medium sans in the Suave style. */
+    fun dots(context: Context): Typeface =
+        if (ThemeStore.soft) sansMedium else context.resources.getFont(R.font.doto_bold)
+
+    /** The dot font reads best in capitals; the soft style uses normal case like One UI. */
+    val caps: Boolean get() = !ThemeStore.soft
 
     fun rounded(color: Int, radiusDp: Float, context: Context, strokeColor: Int = 0, strokeDp: Int = 0): GradientDrawable =
         GradientDrawable().apply {
@@ -69,7 +74,7 @@ object Design {
         textSize = sizeSp
         setTextColor(Ui.WHITE)
         typeface = dots(context)
-        isAllCaps = true
+        isAllCaps = caps
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
         includeFontPadding = false

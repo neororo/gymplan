@@ -14,6 +14,7 @@ class DotApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashLog.install(this)
+        ThemeStore.load(this)
     }
 }
 

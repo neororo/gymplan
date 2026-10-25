@@ -190,6 +190,12 @@
         <item quantity="other">%1$d permisos pendientes · Revisar</item>
     </plurals>
 
+    <string name="group_look">Apariencia</string>
+    <string name="row_style">Estilo</string>
+    <string name="style_dots">Puntos</string>
+    <string name="style_soft">Suave</string>
+    <string name="style_hint">Cambia el aspecto de la app y de todos tus widgets. Las paletas «suave» combinan mejor con el estilo Suave.</string>
+    <string name="style_apply">Aplicar estilo</string>
     <string name="group_weather">Tiempo</string>
     <string name="group_screen">Pantalla</string>
     <string name="group_data">Tus datos</string>
