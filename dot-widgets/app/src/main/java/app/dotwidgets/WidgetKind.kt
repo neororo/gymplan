@@ -64,6 +64,10 @@ enum class WidgetKind(
     QUICK(
         QuickWidget::class.java, R.string.quick_name, R.string.quick_desc,
         listOf(R.string.style_buttons), 250, 70,
+    ),
+    RATES(
+        RatesWidget::class.java, R.string.rates_name, R.string.rates_desc,
+        listOf(R.string.style_value, R.string.style_list), 180, 180,
     );
 
     companion object {

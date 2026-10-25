@@ -43,6 +43,7 @@ data class DeviceState(
     val events: List<CalendarEvent>? = emptyList(),
     /** Used and total bytes. */
     val storage: Pair<Long, Long> = 0L to 1L,
+    val rates: RatesData? = null,
 )
 
 /**
@@ -114,6 +115,7 @@ class Renderer(
             WidgetKind.PHOTO -> photo(canvas, area)
             WidgetKind.STORAGE -> storage(canvas, area, device.storage)
             WidgetKind.QUICK -> quickPreview(canvas, area)
+            WidgetKind.RATES -> rates(canvas, area, device.rates, now.toLocalDate())
         }
         return bitmap
     }
@@ -1186,6 +1188,84 @@ class Renderer(
                 context.contentResolver.openInputStream(uri)?.use { android.graphics.BitmapFactory.decodeStream(it, null, options) }
             }
         }.getOrNull()
+    }
+
+    // ---- Exchange rates ----------------------------------------------------------------------
+
+    private fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
+        today -> "HOY"
+        today.minusDays(1) -> "AYER"
+        else -> "${date.dayOfMonth} ${date.month.getDisplayName(TextStyle.SHORT, locale).trimEnd('.')}".uppercase(locale)
+    }
+
+    /** "SUBE $2,15 · 0,23%", "BAJA …" or "SIN CAMBIO", with the colour to use. */
+    private fun changeText(series: RateSeries): Pair<String, Int> {
+        val delta = series.change ?: return "SIN DATO ANTERIOR" to dim
+        val previous = series.previous?.value ?: return "SIN DATO ANTERIOR" to dim
+        if (abs(delta) < 1e-9) return "SIN CAMBIO" to secondary
+        val percent = java.text.NumberFormat.getNumberInstance(Indicator.CHILE).apply {
+            minimumFractionDigits = 2
+            maximumFractionDigits = 2
+        }.format(abs(delta) / previous * 100)
+        val word = if (delta > 0) "SUBE" else "BAJA"
+        return "$word $${series.indicator.formatChange(delta)} · $percent%" to (if (delta > 0) accent else secondary)
+    }
+
+    private fun rates(canvas: Canvas, area: RectF, data: RatesData?, today: LocalDate) {
+        if (data == null || data.series.isEmpty()) return notice(canvas, area, "CARGANDO…", "Toca para actualizar")
+        if (config.style == 1) return ratesList(canvas, area, data, today)
+        val series = data.series[Indicator.of(config.indicator)] ?: data.series.values.first()
+        val latest = series.latest ?: return
+        val h = area.height()
+        fitText(canvas, series.indicator.longLabel, RectF(area.left, area.top, area.left + area.width() * 0.68f, area.top + h * 0.14f), bold, secondary, Paint.Align.LEFT, "UNIDAD TRIBUTARIA")
+        fitText(canvas, dayLabel(latest.date, today), RectF(area.left + area.width() * 0.72f, area.top, area.right, area.top + h * 0.14f), bold, dim, Paint.Align.RIGHT, "00 MMM")
+        fitText(canvas, series.indicator.format(latest.value), RectF(area.left, area.top + h * 0.2f, area.right, area.top + h * 0.58f), bold, fg, Paint.Align.LEFT, "$00.000,00")
+        val (change, color) = changeText(series)
+        fitText(canvas, change, RectF(area.left, area.top + h * 0.63f, area.right, area.top + h * 0.75f), bold, color, Paint.Align.LEFT, "SUBE $00,00 · 0,00%")
+        sparkline(canvas, RectF(area.left, area.top + h * 0.82f, area.right, area.bottom), series)
+    }
+
+    /** Recent values as dots, oldest on the left; the latest in the accent colour. */
+    private fun sparkline(canvas: Canvas, box: RectF, series: RateSeries) {
+        val values = series.points.take(20).reversed().map { it.value }
+        if (values.size < 2) return
+        val lo = values.minOrNull() ?: return
+        val hi = values.maxOrNull() ?: return
+        val step = box.width() / values.size
+        val r = min(step * 0.3f, box.height() * 0.16f)
+        values.forEachIndexed { i, v ->
+            val t = if (hi - lo < 1e-9) 0.5f else ((v - lo) / (hi - lo)).toFloat()
+            val y = box.bottom - r - t * (box.height() - 2 * r)
+            paint.color = if (i == values.lastIndex) accent else fg
+            canvas.drawCircle(box.left + step * (i + 0.5f), y, if (i == values.lastIndex) r * 1.3f else r, paint)
+        }
+    }
+
+    private fun ratesList(canvas: Canvas, area: RectF, data: RatesData, today: LocalDate) {
+        val h = area.height()
+        fitText(canvas, "BANCO CENTRAL", RectF(area.left, area.top, area.left + area.width() * 0.66f, area.top + h * 0.14f), bold, accent, Paint.Align.LEFT, "BANCO CENTRAL")
+        data.series[Indicator.DOLAR]?.latest?.let {
+            fitText(canvas, dayLabel(it.date, today), RectF(area.left + area.width() * 0.7f, area.top, area.right, area.top + h * 0.14f), bold, dim, Paint.Align.RIGHT, "00 MMM")
+        }
+        val rows = Indicator.entries
+        val top = area.top + h * 0.22f
+        val rowH = (area.bottom - top) / rows.size
+        rows.forEachIndexed { i, indicator ->
+            val y = top + rowH * i
+            val series = data.series[indicator]
+            val textBox = RectF(area.left, y + rowH * 0.15f, area.right, y + rowH * 0.85f)
+            fitText(canvas, indicator.label, RectF(textBox.left, textBox.top, textBox.left + area.width() * 0.3f, textBox.bottom), bold, secondary, Paint.Align.LEFT, "DÓLAR")
+            val value = series?.latest?.let { indicator.format(it.value) } ?: "—"
+            fitText(canvas, value, RectF(textBox.left + area.width() * 0.38f, textBox.top, textBox.right, textBox.bottom), bold, fg, Paint.Align.RIGHT, "$00.000,00")
+            // Small change marker between label and value: accent when the value went up.
+            val delta = series?.change
+            paint.color = when {
+                delta == null || abs(delta) < 1e-9 -> dim
+                delta > 0 -> accent
+                else -> fg
+            }
+            canvas.drawCircle(area.left + area.width() * 0.33f, textBox.centerY(), rowH * 0.09f, paint)
+        }
     }
 
     // ---- Quick settings ----------------------------------------------------------------------

@@ -19,6 +19,7 @@ App Android de widgets para la pantalla de inicio en estilo matriz de puntos, in
 | Foto | Rellenar, completa · puntos, puntos a color o foto | Cambia la foto |
 | Almacenamiento | Anillo, barra | Abre el almacenamiento |
 | Ajustes rápidos | Linterna, Wi-Fi, Bluetooth, No molestar | Cada botón por separado |
+| Tipo de cambio | Valor (con variación y gráfica de puntos), lista · dólar, euro, UF o UTM | Actualiza |
 | Música | Compacto, grande, carátula · carátula en puntos, puntos a color o foto | Abre el reproductor; botones ⏮ ⏯ ⏭ |
 
 ## Permisos de los widgets nuevos
@@ -45,6 +46,10 @@ Usa [Open-Meteo](https://open-meteo.com) (gratis, sin cuenta ni clave; datos baj
 - Sin conexión muestra los últimos datos; si tienen más de 90 minutos, indica la hora (`act. 10:30`).
 - Iconos de puntos para despejado (sol o luna), parcial, nublado, niebla, llovizna, lluvia, nieve y tormenta.
 - CI prueba el lector de datos contra la API real en cada compilación.
+
+## Widget de tipo de cambio
+
+Muestra los valores oficiales del **Banco Central de Chile**: dólar observado, euro, UF y UTM. Los obtiene de [mindicador.cl](https://mindicador.cl), que los publica sin necesidad de cuenta ni clave (la API oficial del Banco Central exige registro y una clave personal). Se actualiza cada ~3 horas con internet y al tocarlo; el Banco Central publica un valor por día hábil, y el widget indica la fecha del valor (HOY, AYER o el día). CI prueba el lector contra el servicio real en cada compilación.
 
 ## Widget de música
 

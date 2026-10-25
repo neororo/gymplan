@@ -62,6 +62,7 @@ class StepsWidget : KindWidget(WidgetKind.STEPS)
 class PhotoWidget : KindWidget(WidgetKind.PHOTO)
 class StorageWidget : KindWidget(WidgetKind.STORAGE)
 class QuickWidget : KindWidget(WidgetKind.QUICK)
+class RatesWidget : KindWidget(WidgetKind.RATES)
 
 object WidgetViews {
     // RemoteViews cross binder (~1 MB transaction limit), so keep the bitmap under ~720 KB.
@@ -132,6 +133,7 @@ object WidgetViews {
             stepsStatus = if (kind == WidgetKind.STEPS) StepCounter.status(context) else StepCounter.Status.OK,
             events = if (kind == WidgetKind.EVENTS) CalendarEvents.upcoming(context) else emptyList(),
             storage = if (kind == WidgetKind.STORAGE) Storage.usage() else 0L to 1L,
+            rates = if (kind == WidgetKind.RATES) RatesStore.data(context) else null,
         )
     }
 
@@ -187,6 +189,7 @@ object WidgetViews {
             }
         }
         WidgetKind.STORAGE -> activity(context, id, Intent(android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
+        WidgetKind.RATES -> RatesRefreshReceiver.pending(context)
         WidgetKind.CALENDAR, WidgetKind.DATE -> {
             val uri = CalendarContract.CONTENT_URI.buildUpon()
                 .appendPath("time")

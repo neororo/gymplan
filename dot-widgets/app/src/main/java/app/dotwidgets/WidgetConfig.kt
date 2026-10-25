@@ -23,6 +23,7 @@ data class WidgetConfig(
     val goal: Int = 8000,
     val dotCount: Int = 32,
     val photoUri: String = "",
+    val indicator: String = "dolar",
 ) {
     fun toJson(): String = JSONObject()
         .put("style", style)
@@ -42,6 +43,7 @@ data class WidgetConfig(
         .put("goal", goal)
         .put("dotCount", dotCount)
         .put("photoUri", photoUri)
+        .put("indicator", indicator)
         .toString()
 
     fun target(): LocalDate =
@@ -97,6 +99,7 @@ data class WidgetConfig(
                 goal = o.optInt("goal", fallback.goal).coerceIn(500, 100_000),
                 dotCount = o.optInt("dotCount", fallback.dotCount).coerceIn(8, 96),
                 photoUri = o.optString("photoUri", fallback.photoUri),
+                indicator = o.optString("indicator", fallback.indicator),
             )
         }
     }

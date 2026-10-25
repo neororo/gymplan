@@ -275,6 +275,15 @@ class ConfigActivity : Activity() {
                 )
                 form.addView(Ui.slider(this, R.string.option_dots, 8, 96, config.dotCount, "") { set(config.copy(dotCount = it.coerceAtLeast(8))) })
             }
+            WidgetKind.RATES -> {
+                form.addView(Ui.section(this, R.string.section_indicator))
+                form.addView(
+                    Ui.choices(this, listOf("Dólar", "Euro", "UF", "UTM"), Indicator.entries.indexOf(Indicator.of(config.indicator))) {
+                        set(config.copy(indicator = Indicator.entries[it].code))
+                    },
+                )
+                form.addView(Ui.body(this, getString(R.string.rates_source)))
+            }
             WidgetKind.NOTE -> {
                 form.addView(Ui.section(this, R.string.section_text))
                 form.addView(textField(config.text, multiLine = true) { set(config.copy(text = it)) })

@@ -29,7 +29,7 @@ class RenderSmokeTest {
         return kind.styles.indices.flatMap { style ->
             listOf(
                 base.copy(style = style),
-                base.copy(style = style, font = WidgetConfig.FONT_SANS, scale = 140, showDate = false, fahrenheit = true),
+                base.copy(style = style, font = WidgetConfig.FONT_SANS, scale = 140, showDate = false, fahrenheit = true, indicator = "utm"),
                 base.copy(style = style, font = WidgetConfig.FONT_MONO, scale = 60, hourFormat = WidgetConfig.HOURS_12,
                     period = style % 4, artMode = style % 3, goal = 500, dotCount = 8, photoUri = "content://missing/photo"),
             )
@@ -49,9 +49,14 @@ class RenderSmokeTest {
             CalendarEvent("Cumpleaños", now + 20 * hour, now + 44 * hour, true, "", 2),
             CalendarEvent("Gimnasio", now + 50 * hour, now + 51 * hour, false, "", 3),
         )
+        val day = java.time.LocalDate.now()
+        val rates = RatesData(now, Indicator.entries.associateWith { indicator ->
+            RateSeries(indicator, (0 until 20).map { RateSeries.Point(day.minusDays(it.toLong()), 900.0 + (it * 7) % 13) })
+        })
         val states = listOf(
-            DeviceState(57, false, media, weather, true, steps = 5432, events = events, storage = 99_000_000_000L to 128_000_000_000L),
-            DeviceState(9, true, null, null, false, steps = 12_000, stepsStatus = StepCounter.Status.NO_PERMISSION, events = null),
+            DeviceState(57, false, media, weather, true, steps = 5432, events = events, storage = 99_000_000_000L to 128_000_000_000L, rates = rates),
+            DeviceState(9, true, null, null, false, steps = 12_000, stepsStatus = StepCounter.Status.NO_PERMISSION, events = null,
+                rates = RatesData(now, mapOf(Indicator.UF to RateSeries(Indicator.UF, listOf(RateSeries.Point(day, 39_485.67)))))),
             DeviceState(100, false, null, null, true, stepsStatus = StepCounter.Status.NO_SENSOR, events = emptyList(), storage = 0L to 0L),
         )
         val palettes = Palettes.all(context)

@@ -42,6 +42,9 @@
     <string name="quick_bluetooth">Bluetooth</string>
     <string name="quick_dnd">No molestar</string>
 
+    <string name="rates_name">Tipo de cambio</string>
+    <string name="rates_desc">Dólar observado, euro, UF y UTM del Banco Central</string>
+
     <string name="style_digital">Digital</string>
     <string name="style_stacked">Apilado</string>
     <string name="style_analog">Analógico</string>
@@ -68,6 +71,9 @@
     <string name="style_fill">Rellenar</string>
     <string name="style_fit">Completa</string>
     <string name="style_buttons">Botones</string>
+
+    <string name="style_value">Valor</string>
+    <string name="style_list">Lista</string>
 
     <string name="section_style">Estilo</string>
     <string name="section_colors">Colores</string>
@@ -225,7 +231,10 @@
     <string name="perm_grant">Dar</string>
     <string name="perm_no_sensor">Sin sensor</string>
     <string name="errors_none">No hay errores registrados.</string>
-    <string name="about_text">Widgets de puntos hechos desde cero, sin anuncios ni rastreo. Lo que configuras se queda en tu teléfono.\n\nTipografía Doto, de Óliver Lalan (SIL Open Font License 1.1).\nDatos del tiempo: Open-Meteo.com (CC BY 4.0).</string>
+    <string name="about_text">Widgets de puntos hechos desde cero, sin anuncios ni rastreo. Lo que configuras se queda en tu teléfono.\n\nTipografía Doto, de Óliver Lalan (SIL Open Font License 1.1).\nDatos del tiempo: Open-Meteo.com (CC BY 4.0).\nIndicadores económicos: Banco Central de Chile, vía mindicador.cl.</string>
+
+    <string name="section_indicator">Indicador</string>
+    <string name="rates_source">Valores oficiales del Banco Central de Chile (dólar observado, euro, UF y UTM), obtenidos de mindicador.cl. Se actualizan cada pocas horas y al tocar el widget; el Banco Central publica un valor por día hábil.</string>
 
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>
