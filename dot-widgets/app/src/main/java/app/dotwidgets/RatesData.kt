@@ -9,11 +9,20 @@ import java.time.ZoneId
 import java.util.Locale
 
 /** Chilean indicators published daily by the Banco Central (dólar observado, euro, UF) and monthly (UTM). */
-enum class Indicator(val code: String, val label: String, val longLabel: String, val decimals: Int) {
-    DOLAR("dolar", "DÓLAR", "DÓLAR OBSERVADO", 2),
-    EURO("euro", "EURO", "EURO", 2),
-    UF("uf", "UF", "UNIDAD DE FOMENTO", 2),
-    UTM("utm", "UTM", "UNIDAD TRIBUTARIA", 0);
+enum class Indicator(
+    val code: String,
+    val label: String,
+    val longLabel: String,
+    val decimals: Int,
+    /** Series code in the Banco Central's statistics database (BDE). */
+    val bcchSeries: String,
+    /** How far back to ask the BDE so there are enough points for the change and the sparkline. */
+    val bcchDays: Long,
+) {
+    DOLAR("dolar", "DÓLAR", "DÓLAR OBSERVADO", 2, "F073.TCO.PRE.Z.D", 45),
+    EURO("euro", "EURO", "EURO", 2, "F072.CLP.EUR.N.O.D", 45),
+    UF("uf", "UF", "UNIDAD DE FOMENTO", 2, "F073.UFF.PRE.Z.D", 30),
+    UTM("utm", "UTM", "UNIDAD TRIBUTARIA", 0, "F073.UTR.PRE.Z.M", 400);
 
     /** Chilean format: "$945,32", "$39.485,67", "$68.785". */
     fun format(value: Double): String {
@@ -110,4 +119,48 @@ object Mindicador {
     private fun dateOf(fecha: String): LocalDate =
         runCatching { Instant.parse(fecha).atZone(CHILE_ZONE).toLocalDate() }
             .getOrElse { LocalDate.parse(fecha.take(10)) }
+}
+
+/**
+ * The Banco Central de Chile's own REST API (BDE, "SieteRestWS"), used when the user enters their
+ * personal API token. Plain JVM code; CI tests it live when the BCCH_TOKEN secret is configured.
+ */
+object BcchApi {
+    const val URL = "https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx"
+    private val DAY: java.time.format.DateTimeFormatter = java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy")
+
+    /** The API answers HTTP 200 even on errors; [code] and [description] come from its body. */
+    class ApiError(val code: Int, val description: String) : Exception("Banco Central $code: $description")
+
+    fun url(token: String, indicator: Indicator, today: LocalDate): String {
+        val first = today.minusDays(indicator.bcchDays)
+        return URL +
+            "?token=" + java.net.URLEncoder.encode(token.trim(), "UTF-8") +
+            "&firstdate=" + first + "&lastdate=" + today +
+            "&timeseries=" + indicator.bcchSeries +
+            "&function=GetSeries"
+    }
+
+    /**
+     * `{"Codigo": 0, "Descripcion": "Success", "Series": {"seriesId": "...", "Obs": [
+     *   {"indexDateString": "23-10-2026", "value": "986.58", "statusCode": "OK"}, ...]}}`.
+     * "Series" may also come as a one-element array; days without data have statusCode "ND".
+     */
+    fun parse(json: String, indicator: Indicator): RateSeries {
+        val root = JSONObject(json)
+        val code = root.optInt("Codigo", -1)
+        if (code != 0) throw ApiError(code, root.optString("Descripcion", "Sin descripción"))
+        val series = root.optJSONObject("Series") ?: root.optJSONArray("Series")?.optJSONObject(0)
+            ?: throw ApiError(code, "Respuesta sin serie")
+        val obs = series.optJSONArray("Obs") ?: JSONArray()
+        val points = (0 until obs.length()).mapNotNull { i ->
+            val o = obs.getJSONObject(i)
+            if (!o.optString("statusCode", "OK").equals("OK", ignoreCase = true)) return@mapNotNull null
+            val value = o.optString("value").replace(",", ".").toDoubleOrNull() ?: return@mapNotNull null
+            if (value.isNaN()) return@mapNotNull null
+            RateSeries.Point(LocalDate.parse(o.getString("indexDateString"), DAY), value)
+        }.sortedByDescending { it.date }.distinctBy { it.date }.take(30)
+        if (points.isEmpty()) throw ApiError(code, "Sin valores para ${indicator.bcchSeries}")
+        return RateSeries(indicator, points)
+    }
 }

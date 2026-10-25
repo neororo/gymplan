@@ -51,6 +51,10 @@ Usa [Open-Meteo](https://open-meteo.com) (gratis, sin cuenta ni clave; datos baj
 
 Muestra los valores oficiales del **Banco Central de Chile**: dólar observado, euro, UF y UTM. Los obtiene de [mindicador.cl](https://mindicador.cl), que los publica sin necesidad de cuenta ni clave (la API oficial del Banco Central exige registro y una clave personal). Se actualiza cada ~3 horas con internet y al tocarlo; el Banco Central publica un valor por día hábil, y el widget indica la fecha del valor (HOY, AYER o el día). CI prueba el lector contra el servicio real en cada compilación.
 
+**API oficial del Banco Central:** en **Ajustes → Tipo de cambio → Fuente de datos** puedes pegar tu token personal de la [API BDE](https://si3.bcentral.cl/estadisticas/Principal1/Web_Services/acceso_api.html). La app lo prueba antes de guardarlo y, si funciona, consulta directamente al Banco Central (series `F073.TCO.PRE.Z.D`, `F072.CLP.EUR.N.O.D`, `F073.UFF.PRE.Z.D`, `F073.UTR.PRE.Z.M`). Si la API falla, usa mindicador.cl para ese indicador. El token se guarda solo en el teléfono: no va en la copia de seguridad y la copia automática de Android está desactivada.
+
+Para que CI pruebe también la API oficial, añade el token como secreto del repositorio llamado `BCCH_TOKEN` (GitHub → Settings → Secrets and variables → Actions). Nunca lo pongas en el código.
+
 ## Widget de música
 
 Funciona con Spotify y con cualquier reproductor que publique una sesión multimedia (YouTube Music, podcasts…). Lee la sesión activa del sistema, la misma que usan los controles de la pantalla de bloqueo: no hace falta cuenta de Spotify ni clave de API.

@@ -231,10 +231,28 @@
     <string name="perm_grant">Dar</string>
     <string name="perm_no_sensor">Sin sensor</string>
     <string name="errors_none">No hay errores registrados.</string>
-    <string name="about_text">Widgets de puntos hechos desde cero, sin anuncios ni rastreo. Lo que configuras se queda en tu teléfono.\n\nTipografía Doto, de Óliver Lalan (SIL Open Font License 1.1).\nDatos del tiempo: Open-Meteo.com (CC BY 4.0).\nIndicadores económicos: Banco Central de Chile, vía mindicador.cl.</string>
+    <string name="about_text">Widgets de puntos hechos desde cero, sin anuncios ni rastreo. Lo que configuras se queda en tu teléfono.\n\nTipografía Doto, de Óliver Lalan (SIL Open Font License 1.1).\nDatos del tiempo: Open-Meteo.com (CC BY 4.0).\nIndicadores económicos: Banco Central de Chile (API oficial con tu token, o vía mindicador.cl).</string>
 
     <string name="section_indicator">Indicador</string>
     <string name="rates_source">Valores oficiales del Banco Central de Chile (dólar observado, euro, UF y UTM), obtenidos de mindicador.cl. Se actualizan cada pocas horas y al tocar el widget; el Banco Central publica un valor por día hábil.</string>
+
+    <string name="group_rates">Tipo de cambio</string>
+    <string name="row_rates_source">Fuente de datos</string>
+    <string name="rates_source_free">mindicador.cl (sin token)</string>
+    <string name="rates_source_official">API oficial del Banco Central</string>
+    <string name="rates_source_error">API oficial · error: %1$s (usando mindicador.cl)</string>
+    <string name="rates_source_hint">Con tu token personal, la app consulta directamente al Banco Central de Chile. Sin token usa mindicador.cl, que publica los mismos valores oficiales.</string>
+    <string name="rates_token_hint">Pega aquí tu token de la API</string>
+    <string name="rates_token_saved">Token guardado · escribe otro para cambiarlo</string>
+    <string name="rates_save_test">Guardar y probar</string>
+    <string name="rates_token_empty">Escribe el token primero.</string>
+    <string name="rates_testing">Consultando al Banco Central…</string>
+    <string name="rates_test_ok">Funciona: dólar observado %1$s (%2$s). El widget ya usa la API oficial.</string>
+    <string name="rates_test_api_error">El Banco Central respondió con error %1$d: %2$s. El token no se guardó.</string>
+    <string name="rates_test_offline">No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="rates_test_failed">No se pudo probar el token (%1$s). No se guardó.</string>
+    <string name="rates_remove_token">Quitar token y usar mindicador.cl</string>
+    <string name="rates_token_privacy">El token se guarda solo en este teléfono. No se incluye en la copia de seguridad ni se envía a nadie más que al Banco Central.</string>
 
     <string name="save">Guardar</string>
     <string name="edit">Editar</string>

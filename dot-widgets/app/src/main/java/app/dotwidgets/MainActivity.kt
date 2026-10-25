@@ -307,6 +307,19 @@ class MainActivity : Activity() {
             },
         )))
 
+        content.addView(Design.groupLabel(this, getString(R.string.group_rates)))
+        val status = RatesSource.status(this)
+        val sourceValue = when {
+            RatesSource.token(this) == null -> getString(R.string.rates_source_free)
+            status == null || status == "ok" -> getString(R.string.rates_source_official)
+            else -> getString(R.string.rates_source_error, status)
+        }
+        content.addView(Design.group(this, listOf(
+            Design.row(this, getString(R.string.row_rates_source), sourceValue, if (status != null && status != "ok" && RatesSource.token(this) != null) Ui.RED else Design.GRAY) {
+                openRatesSource()
+            },
+        )))
+
         if (Wallpapers.canSet(this)) {
             val applied = Wallpapers.applied(this)
             val value = applied?.let { (style, target) -> "${getString(style.label)} · ${targetLabel(target).lowercase()}" }
@@ -425,6 +438,70 @@ class MainActivity : Activity() {
                     inBackground(R.string.wallpaper_restored) { Wallpapers.restoreDefault(this) }
                 }
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
+        }
+    }
+
+    /** Where exchange rates come from: the user's Banco Central token, or mindicador.cl without one. */
+    private fun openRatesSource() {
+        Design.sheet(this, getString(R.string.row_rates_source), getString(R.string.rates_source_hint)) { body, dialog ->
+            val input = android.widget.EditText(this).apply {
+                hint = getString(if (RatesSource.token(this@MainActivity) == null) R.string.rates_token_hint else R.string.rates_token_saved)
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                setTextColor(Ui.WHITE)
+                setHintTextColor(Design.DIM)
+                typeface = Design.sans
+                setSingleLine(true)
+                background = Design.rounded(Design.CARD, 12f, this@MainActivity, 0xFF3A3A3A.toInt(), 1)
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+            }
+            val result = Design.text(this, "", 14f, Design.GRAY).apply { setPadding(0, dp(12), 0, 0) }
+            body.addView(input, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(20) })
+            body.addView(result)
+            lateinit var save: TextView
+            save = Design.primaryButton(this, getString(R.string.rates_save_test)) {
+                val token = input.text.toString().trim()
+                if (token.isEmpty()) {
+                    result.setText(R.string.rates_token_empty)
+                    return@primaryButton
+                }
+                save.isEnabled = false
+                result.setTextColor(Design.GRAY)
+                result.setText(R.string.rates_testing)
+                Thread {
+                    val outcome = RatesSource.test(token)
+                    runOnUiThread {
+                        save.isEnabled = true
+                        outcome.onSuccess { series ->
+                            // Only a token that works is kept; the widget switches to it right away.
+                            RatesSource.setToken(this, token)
+                            RatesSource.setStatus(this, "ok")
+                            RatesJob.runNow(this)
+                            val latest = series.latest!!
+                            result.setTextColor(Ui.WHITE)
+                            result.text = getString(R.string.rates_test_ok, Indicator.DOLAR.format(latest.value), latest.date.toString())
+                            input.setText("")
+                            render()
+                        }.onFailure { error ->
+                            result.setTextColor(Ui.RED)
+                            result.text = when (error) {
+                                is BcchApi.ApiError -> getString(R.string.rates_test_api_error, error.code, error.description)
+                                is java.io.IOException -> getString(R.string.rates_test_offline)
+                                else -> getString(R.string.rates_test_failed, error.javaClass.simpleName)
+                            }
+                        }
+                    }
+                }.start()
+            }
+            body.addView(save, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(16) })
+            if (RatesSource.token(this) != null) {
+                body.addView(Design.textButton(this, getString(R.string.rates_remove_token)) {
+                    RatesSource.setToken(this, null)
+                    RatesJob.runNow(this)
+                    dialog.dismiss()
+                    render()
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
+            }
+            body.addView(Design.text(this, getString(R.string.rates_token_privacy), 12f, Design.DIM).apply { setPadding(0, dp(12), 0, 0) })
         }
     }
 

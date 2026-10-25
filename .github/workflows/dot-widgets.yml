@@ -27,6 +27,8 @@ jobs:
         # LIVE_API=1 lets the weather parser test hit the real Open-Meteo API.
         env:
           LIVE_API: "1"
+          # Optional repository secret; enables the live test of the official Banco Central API.
+          BCCH_TOKEN: ${{ secrets.BCCH_TOKEN }}
         run: ./gradlew --no-daemon assembleDebug lintDebug testDebugUnitTest
 
       - name: Upload APK

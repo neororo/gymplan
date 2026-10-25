@@ -23,13 +23,60 @@ object RatesStore {
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }
 
+/**
+ * The user's personal Banco Central API token. Stored only in the app's private storage: it is not
+ * part of the settings export, and Android cloud backup is disabled for the app (allowBackup=false).
+ */
+object RatesSource {
+    private const val PREFS = "rates_source"
+
+    fun token(context: Context): String? = prefs(context).getString("token", null)?.takeIf { it.isNotBlank() }
+
+    fun setToken(context: Context, token: String?) {
+        prefs(context).edit().apply { if (token.isNullOrBlank()) remove("token") else putString("token", token.trim()) }.remove("status").apply()
+    }
+
+    /** Last result of using the token: null if not used yet, "ok", or an error description. */
+    fun status(context: Context): String? = prefs(context).getString("status", null)
+
+    fun setStatus(context: Context, status: String) {
+        prefs(context).edit().putString("status", status).apply()
+    }
+
+    /** Tries the token against the real API with the dollar series; returns a message for the user. Blocking. */
+    fun test(token: String): Result<RateSeries> = runCatching {
+        BcchApi.parse(Http.get(BcchApi.url(token, Indicator.DOLAR, java.time.LocalDate.now())), Indicator.DOLAR)
+    }
+
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+}
+
 object RatesApi {
-    /** Downloads every indicator (one small request each), stores them and redraws. Blocking. */
+    /**
+     * Downloads every indicator (one small request each), stores them and redraws. Blocking.
+     * With a token it asks the Banco Central directly and falls back to mindicador.cl per indicator.
+     */
     fun refresh(context: Context): Boolean {
         val previous = RatesStore.data(context)?.series.orEmpty()
         val series = mutableMapOf<Indicator, RateSeries>()
         var networkFailed = false
+        val token = RatesSource.token(context)
+        var tokenError: String? = null
+        var tokenWorked = false
         for (indicator in Indicator.entries) {
+            if (token != null) {
+                try {
+                    series[indicator] = BcchApi.parse(Http.get(BcchApi.url(token, indicator, java.time.LocalDate.now())), indicator)
+                    tokenWorked = true
+                    continue
+                } catch (error: BcchApi.ApiError) {
+                    tokenError = tokenError ?: "${indicator.label}: ${error.description}"
+                } catch (error: java.io.IOException) {
+                    // Fall through to mindicador.cl.
+                } catch (error: Throwable) {
+                    CrashLog.record(context, "Banco Central (${indicator.code})", error)
+                }
+            }
             try {
                 series[indicator] = Mindicador.parseSeries(Http.get(Mindicador.seriesUrl(indicator)), indicator)
             } catch (error: java.io.IOException) {
@@ -38,6 +85,7 @@ object RatesApi {
                 CrashLog.record(context, "tipo de cambio (${indicator.code})", error)
             }
         }
+        if (token != null && (tokenWorked || tokenError != null)) RatesSource.setStatus(context, tokenError ?: "ok")
         if (series.isEmpty()) return false
         // Keep older values for any indicator that failed this time.
         RatesStore.save(context, RatesData(System.currentTimeMillis(), previous + series))
